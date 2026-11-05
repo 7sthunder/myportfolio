@@ -157,7 +157,7 @@ export default function ParticleHero() {
 
         <section className="pp-about" aria-label="About">
           <p className="pp-about__text" ref={about}>
-            I turn ambitious ideas into fast, reliable web products. Frontend, backend, performance — as a technical
+            I turn ambitious ideas into fast, reliable web products. Frontend, backend, performance. As a technical
             partner for startups, founders and product teams.
           </p>
         </section>

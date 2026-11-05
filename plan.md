@@ -647,6 +647,6 @@ export default function ParticlePortraitHero() {
 
 ## 11. Content to confirm with Aadhi
 
-- About paragraph (written by the assistant; change it in `index.html` and in the React component): *"I turn ambitious ideas into fast, reliable web products. Frontend, backend, performance — as a technical partner for startups, founders and product teams."*
+- About paragraph (written by the assistant; change it in `index.html` and in the React component): *"I turn ambitious ideas into fast, reliable web products. Frontend, backend, performance. As a technical partner for startups, founders and product teams."*
 - Ring text, kept from the reference: "Available everywhere" / "Working globally".
 - Whether the comet cursor should be site-wide or only over the hero. It is currently site-wide; it hides the native cursor through the `pp-has-cursor` class on `<html>`.
