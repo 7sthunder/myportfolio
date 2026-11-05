@@ -27,7 +27,7 @@ export default function ParticleHero() {
     // Keeps the orbiting "Available everywhere / Working globally" text hugging the globe.
     const layoutRing = (layout) => {
       const fontSize = parseFloat(getComputedStyle(ringEl).fontSize) || 24;
-      const r = layout.globe.radiusPx + fontSize * 0.42;
+      const r = layout.globe.radiusPx + fontSize * 1.1;
       const half = Math.ceil(r + fontSize * 1.5);
       ringEl.setAttribute('viewBox', `${-half} ${-half} ${half * 2} ${half * 2}`);
       ringEl.style.width = `${half * 2}px`;
