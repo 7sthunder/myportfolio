@@ -51,6 +51,10 @@ export const particleVertex = /* glsl */ `
   uniform vec3 uScatterOffset;
 
   uniform float uMorph;
+  uniform float uWork;
+  uniform float uHelixTime;
+  uniform float uHelixRadius;
+  uniform float uHelixLength;
   uniform float uSwirl;
   uniform float uSpherePhase;
   uniform vec3 uBands; // x = count, y = top (local y), z = band height
@@ -125,6 +129,19 @@ export const particleVertex = /* glsl */ `
     vec3 local = position + drift;
     float discW = 0.0;
     if (uMorph > 0.0001) local = toSphere(local, uMorph, discW);
+
+    // Works section: the cloud gathers into a double helix (DNA) along the vertical axis. Each
+    // particle is pinned to one of two strands (aRandom.w picks the strand, aRandom.z the slot
+    // along the helix) and the strands wind with uHelixTime, so the whole field turns as the
+    // visitor scrolls. Blended by uWork, so the globe/portrait states are unchanged at uWork = 0.
+    if (uWork > 0.0001) {
+      float strand = step(0.5, fract(aRandom.w * 17.3));
+      float along = (fract(aRandom.z * 31.7) - 0.5) * uHelixLength;
+      float angle = along * 4.2 + uHelixTime + strand * PI;
+      float radius = uHelixRadius * (0.96 + 0.08 * fract(aRandom.x * 9.1));
+      vec3 helix = vec3(cos(angle) * radius, along, sin(angle) * radius * 0.35);
+      local = mix(local, helix, smoothstep(0.0, 1.0, uWork));
+    }
 
     vec4 world = modelMatrix * vec4(local, 1.0);
 

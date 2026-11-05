@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { works } from '../data/works.js';
+import { usePortrait } from './ParticleBackground.jsx';
 
 const base = import.meta.env.BASE_URL;
 const GAP_VW = 12;
@@ -52,6 +53,7 @@ function WorkTile({ work }) {
 }
 
 export default function FeaturedWorks() {
+  const portrait = usePortrait();
   const section = useRef(null);
   const kicker = useRef(null);
   const closing = useRef(null);
@@ -70,6 +72,7 @@ export default function FeaturedWorks() {
 
   useEffect(() => {
     const el = section.current;
+    const helixTarget = portrait?.state ?? null;
     let frame = 0;
 
     const update = () => {
@@ -81,10 +84,11 @@ export default function FeaturedWorks() {
       if (!inView) {
         kicker.current.dataset.active = 'false';
         closing.current.dataset.active = 'false';
+        if (helixTarget) helixTarget.work = 0;
         return;
       }
 
-      const near = rect.bottom > 0.6 * window.innerHeight;
+      const near = rect.top < 0.4 * window.innerHeight && rect.bottom > 0.6 * window.innerHeight;
       const travel = Math.min(Math.max(revealSpan - rect.top, 0) * speed, maxTravel);
       const progress = travel / maxTravel;
       track.current.style.transform = `translateX(${start + smootherstep(progress) * maxTravel}px)`;
@@ -94,6 +98,12 @@ export default function FeaturedWorks() {
       const showClosing = near && closingAmount > 0.5;
       closing.current.dataset.active = String(showClosing);
       kicker.current.dataset.active = String(near && !showClosing);
+
+      // The particle cloud forms the helix while the works are on screen and dissolves back
+      // as the closing line arrives.
+      if (helixTarget) {
+        helixTarget.work = smootherstep(clamp01(Math.min(progress * 2.5, 1) * (1 - closingAmount)));
+      }
     };
 
     const schedule = () => {
@@ -106,8 +116,9 @@ export default function FeaturedWorks() {
       cancelAnimationFrame(frame);
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
+      if (helixTarget) helixTarget.work = 0;
     };
-  }, []);
+  }, [portrait]);
 
   return (
     <section className="pp-works" ref={section} aria-label="Featured works">

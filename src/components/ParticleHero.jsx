@@ -1,17 +1,15 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ParticlePortrait } from '../particle-portrait/index.js';
 import { CometCursor } from '../experience/CometCursor.js';
 import { splitText } from '../experience/text.js';
+import { usePortrait } from './ParticleBackground.jsx';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const base = import.meta.env.BASE_URL;
-
 export default function ParticleHero() {
+  const portrait = usePortrait();
   const experience = useRef(null);
-  const stage = useRef(null);
   const ring = useRef(null);
   const ringPath = useRef(null);
   const name = useRef(null);
@@ -19,6 +17,7 @@ export default function ParticleHero() {
   const about = useRef(null);
 
   useEffect(() => {
+    if (!portrait) return;
     const ringEl = ring.current;
     const ringPathEl = ringPath.current;
     const params = new URLSearchParams(window.location.search);
@@ -35,13 +34,13 @@ export default function ParticleHero() {
       ringPathEl.setAttribute('d', `M 0 ${-r} A ${r} ${r} 0 1 1 0 ${r} A ${r} ${r} 0 1 1 0 ${-r}`);
     };
 
-    const portrait = new ParticlePortrait(stage.current, {
-      map: `${base}portrait/portrait-map.png`,
-      meta: `${base}portrait/portrait-map.json`,
-      count: params.has('count') ? Number(params.get('count')) : null,
-      onLayout: layoutRing,
-    });
     const cursor = new CometCursor();
+    const prevLayout = portrait.options.onLayout;
+    portrait.options.onLayout = (layout, instance) => {
+      prevLayout?.(layout, instance);
+      layoutRing(layout);
+    };
+    if (portrait.layout) layoutRing(portrait.layout);
     const ringState = { spin: 0, drift: 0 };
     let ringValue = -1;
     let alive = true;
@@ -111,7 +110,7 @@ export default function ParticleHero() {
 
     // Debug / capture hooks (used by tools/capture.mjs). Enabled in dev or with ?debug.
     if (import.meta.env.DEV || params.has('debug')) {
-      window.__pp = { portrait, intro, cursor, gsap, ScrollTrigger };
+      window.__pp = { ...window.__pp, portrait, intro, cursor, gsap, ScrollTrigger };
     }
 
     return () => {
@@ -119,14 +118,14 @@ export default function ParticleHero() {
       gsap.ticker.remove(tick);
       ctx.revert();
       cursor.dispose();
-      portrait.dispose();
-      delete window.__pp;
+      portrait.options.onLayout = prevLayout;
+      if (window.__pp) delete window.__pp.intro;
     };
-  }, []);
+  }, [portrait]);
 
   return (
     <div className="pp-experience" ref={experience}>
-      <div className="pp-stage" ref={stage}>
+      <div className="pp-ring-stage">
         <svg className="pp-ring" ref={ring} aria-hidden="true" focusable="false">
           <defs>
             <path id="pp-ring-path" ref={ringPath} d="M0 -1 A1 1 0 1 1 0 1 A1 1 0 1 1 0 -1" />

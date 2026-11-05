@@ -40,6 +40,10 @@ export class PortraitParticles {
       uScatterOffset: { value: new THREE.Vector3() },
 
       uMorph: { value: 0 },
+      uWork: { value: 0 },
+      uHelixTime: { value: 0 },
+      uHelixRadius: { value: 0.16 },
+      uHelixLength: { value: 3.4 },
       uSwirl: { value: 0 },
       uSpherePhase: { value: 0 },
       uBands: { value: new THREE.Vector3(data.bands.count, data.bands.top, data.bands.height) },

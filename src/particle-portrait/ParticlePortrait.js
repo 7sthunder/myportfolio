@@ -61,7 +61,7 @@ export class ParticlePortrait {
     this.options.composition = { ...DEFAULT_COMPOSITION, ...(options.composition ?? {}) };
     this.reducedMotion = this.options.reducedMotion ?? prefersReducedMotion();
 
-    this.state = { shift: 0, morph: 0 };
+    this.state = { shift: 0, morph: 0, work: 0 };
     this.anim = { intro: 0, formation: 0, blur: 0, aperture: this.options.introAperture };
     this.time = 0;
     this.swirl = 0;
@@ -432,6 +432,8 @@ export class ParticlePortrait {
     u.uBlur.value = this.anim.blur;
     u.uAperture.value = this.anim.aperture;
     u.uMorph.value = morph;
+    u.uWork.value = clamp(this.state.work);
+    u.uHelixTime.value = this.time * 0.6 + this.state.work * 2.4;
     u.uSwirl.value = this.swirl;
     u.uSpherePhase.value = this.spherePhase;
     u.uPointer.value.copy(this.light);
