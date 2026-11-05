@@ -150,6 +150,90 @@ html.pp-has-cursor * {
   white-space: nowrap;
 }
 
+/* ---------------------------------------------------------------- featured works */
+
+.pp-works {
+  position: relative;
+  z-index: 2;
+  padding: 14vh var(--pp-gutter) 18vh;
+  background: var(--pp-bg);
+}
+
+.pp-works__title {
+  margin: 0 0 6vh;
+  font-size: clamp(28px, 3.2vw, 56px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.pp-works__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: clamp(28px, 3vw, 48px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-work__shot {
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border: 1px solid rgba(238, 238, 242, 0.1);
+  border-radius: 12px;
+  background: #1f1e23;
+}
+
+.pp-work__shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.pp-work__body {
+  padding-top: 18px;
+}
+
+.pp-work__label {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: rgba(238, 238, 242, 0.55);
+}
+
+.pp-work__status {
+  color: rgba(238, 238, 242, 0.4);
+}
+
+.pp-work__name {
+  margin: 0 0 10px;
+  font-size: clamp(20px, 1.8vw, 26px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.pp-work__blurb {
+  margin: 0 0 12px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(238, 238, 242, 0.8);
+}
+
+.pp-work__tags {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(238, 238, 242, 0.5);
+}
+
+.pp-work__link {
+  color: var(--pp-fg);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 /* ---------------------------------------------------------------- responsive */
 
 /* Medium landscape: the long designation breaks onto two lines so it never touches the bust. */

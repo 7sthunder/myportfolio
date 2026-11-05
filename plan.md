@@ -146,7 +146,9 @@ pf/
 │  ├─ main.jsx                React entry (createRoot + StrictMode)
 │  ├─ App.jsx                 App shell (<main class="pp-page">)
 │  ├─ components/
-│  │  └─ ParticleHero.jsx     Hero component: intro timeline, ScrollTrigger choreography, ring text, debug hook
+│  │  ├─ ParticleHero.jsx     Hero component: intro timeline, ScrollTrigger choreography, ring text, debug hook
+│  │  └─ FeaturedWorks.jsx    "My Featured Works" section (after the hero, outside the pinned stage)
+│  ├─ data/works.js           Project text for the works section (source: the portfolio's src/data.ts)
 │  ├─ styles.css              All page styles (.pp-*), responsive rules
 │  ├─ experience/
 │  │  ├─ CometCursor.js       Custom cursor (2D canvas overlay, speed-based tapered tail)
