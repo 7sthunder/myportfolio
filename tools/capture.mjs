@@ -59,7 +59,7 @@ const frames = (n = 2) =>
     n,
   );
 
-const target = query ? `${url}${url.includes('?') ? '&' : '?'}${query}` : url;
+const target = `${url}${url.includes('?') ? '&' : '?'}${[query, 'debug'].filter(Boolean).join('&')}`;
 // Retry once: a dev-server reload (HMR / dependency optimisation) can interrupt the first load.
 for (let attempt = 0; ; attempt++) {
   try {

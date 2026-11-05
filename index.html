@@ -16,41 +16,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..600&display=swap" />
+    <!-- Linked here (not imported from JS) so the styles are render-blocking and never flash unstyled. -->
+    <link rel="stylesheet" href="/src/styles.css" />
     <link rel="preload" href="./portrait/portrait-map.png" as="fetch" type="image/png" crossorigin="anonymous" />
-    <script type="module" src="/src/main.js"></script>
   </head>
   <body>
-    <main class="pp-page">
-      <div class="pp-experience" data-pp-experience>
-        <div class="pp-stage" data-pp-stage>
-          <svg class="pp-ring" data-pp-ring aria-hidden="true" focusable="false">
-            <defs><path id="pp-ring-path" data-pp-ring-path d="M0 -1 A1 1 0 1 1 0 1 A1 1 0 1 1 0 -1" /></defs>
-            <text><textPath href="#pp-ring-path" startOffset="75%" text-anchor="middle">Available everywhere</textPath></text>
-            <text><textPath href="#pp-ring-path" startOffset="25%" text-anchor="middle">Working globally</textPath></text>
-          </svg>
-        </div>
-
-        <div class="pp-content">
-          <section class="pp-hero" aria-label="Introduction">
-            <h1 class="pp-hero__name" data-pp-name>Aadhi Narayanan</h1>
-            <p class="pp-hero__role" data-pp-role>
-              <span class="pp-role__line">Software Developer /</span>
-              <span class="pp-role__line">Full Stack Developer</span>
-            </p>
-          </section>
-
-          <section class="pp-about" aria-label="About">
-            <p class="pp-about__text" data-pp-about>
-              I turn ambitious ideas into fast, reliable web products. Frontend, backend, performance — as a
-              technical partner for startups, founders and product teams.
-            </p>
-          </section>
-
-          <section class="pp-globe" aria-label="Availability">
-            <p class="pp-sr-only">Available everywhere. Working globally.</p>
-          </section>
-        </div>
-      </div>
-    </main>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

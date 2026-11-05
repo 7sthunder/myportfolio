@@ -84,12 +84,12 @@ export const particleVertex = /* glsl */ `
   // Portrait -> globe. Each horizontal slice spins around the vertical axis (neighbouring slices
   // counter-rotate), flattens into a disc with differential "galaxy" rotation, then settles on
   // its latitude band of the sphere. Exactly the identity at m = 0 and the sphere at m = 1.
-  vec3 toSphere(vec3 p, float m) {
+  vec3 toSphere(vec3 p, float m, out float w) {
     float band = aSphere.w;
     float bandT = band / max(uBands.x - 1.0, 1.0);
     float t = clamp((m - bandT * 0.2 - aRandom.w * 0.08) / 0.72, 0.0, 1.0);
     float e = easeInOutCubic(t);
-    float w = sin(PI * t);
+    w = sin(PI * t);
 
     float rp = length(p.xz);
     float thp = atan(p.z, p.x);
@@ -107,7 +107,8 @@ export const particleVertex = /* glsl */ `
     float k = smoothstep(0.12, 0.75, t);
     float center = mix(uBands.y - (band + 0.5) * uBands.z, uBandSphere[int(band + 0.5)], k);
     float y = mix(p.y, s.y, k);
-    y = mix(y, center + (y - center) * 0.3, w * 0.85);
+    float squash = smoothstep(0.15, 0.4, t) * (1.0 - smoothstep(0.88, 1.0, t));
+    y = mix(y, center + (y - center) * 0.18, squash * 0.95);
     return vec3(r * cos(th), y, r * sin(th));
   }
 
@@ -122,7 +123,8 @@ export const particleVertex = /* glsl */ `
     ) * uDrift * (0.35 + aRandom.x * 0.65 + (1.0 - aShade.z) * 1.6);
 
     vec3 local = position + drift;
-    if (uMorph > 0.0001) local = toSphere(local, uMorph);
+    float discW = 0.0;
+    if (uMorph > 0.0001) local = toSphere(local, uMorph, discW);
 
     vec4 world = modelMatrix * vec4(local, 1.0);
 
@@ -177,6 +179,7 @@ export const particleVertex = /* glsl */ `
     b *= 1.0 + uRim * rim * rim + uFeature * aShade.y;
     b *= mix(0.75, 1.0, aShade.z);
     b *= mix(1.0 - uDepthFade, 1.0, aShade.w);
+    b *= 1.0 + 0.6 * discW;
     b *= 0.86 + 0.14 * sin(uTime * (0.6 + aRandom.z * 2.4) + ph * 9.0);
 
     // The cursor doubles as a soft light: contours facing it catch more light.

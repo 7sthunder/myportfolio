@@ -394,7 +394,7 @@ export class ParticlePortrait {
     const morph = clamp(this.state.morph);
     const em = easeInOutCubic(morph);
     // The vortex glides to centre early, so the discs swirl mid-screen (as in the reference).
-    const pm = easeInOutCubic(clamp(morph / 0.72));
+    const pm = easeInOutCubic(clamp((morph - 0.15) / 0.75));
 
     // Group transform: hero -> about (shift) -> globe (morph).
     const ax = lerp(L.hero.x, L.about.x, shift);

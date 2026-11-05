@@ -80,6 +80,13 @@ html.pp-has-cursor * {
   display: inline;
 }
 
+/* Text stays hidden until the intro splits it, so the plain text never flashes before the animation. */
+.pp-hero__name:not([data-split]),
+.pp-hero__role:not([data-split]),
+.pp-about__text:not([data-split]) {
+  visibility: hidden;
+}
+
 .pp-word {
   display: inline-block;
   white-space: nowrap;

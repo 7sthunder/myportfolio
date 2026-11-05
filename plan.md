@@ -135,7 +135,7 @@ npm run preview   # serves dist/ at http://localhost:4173
 
 ```
 pf/
-├─ index.html                 Standalone page: stage + hero / about / globe sections
+├─ index.html                 Vite entry: <div id="root">, stylesheet link (render-blocking)
 ├─ vite.config.js             base './', port 5173, preview 4173
 ├─ package.json               scripts: dev, build, preview, portrait:prepare, reference:frames, capture
 ├─ plan.md                    ← this file
@@ -143,7 +143,10 @@ pf/
 │  ├─ portrait-map.png        Packed data map (opaque PNG): R = luminance, G = depth (255 = near), B = matte
 │  └─ portrait-map.json       Map size + anchors (headCenterX, headTop, neckY, subject bounds), normalised 0..1
 ├─ src/
-│  ├─ main.js                 Page wiring: intro timeline, ScrollTrigger choreography, ring text, debug hook
+│  ├─ main.jsx                React entry (createRoot + StrictMode)
+│  ├─ App.jsx                 App shell (<main class="pp-page">)
+│  ├─ components/
+│  │  └─ ParticleHero.jsx     Hero component: intro timeline, ScrollTrigger choreography, ring text, debug hook
 │  ├─ styles.css              All page styles (.pp-*), responsive rules
 │  ├─ experience/
 │  │  ├─ CometCursor.js       Custom cursor (2D canvas overlay, speed-based tapered tail)
@@ -353,7 +356,11 @@ The tool prints the GPU, the particle counts (generated and drawn), sampling tim
 
 ## 7. Remaining work: step by step
 
-### Step 1 — Finish the globe-morph "disc" stage (IN PROGRESS)
+### Step 1 — Finish the globe-morph "disc" stage (DONE, 05 Nov 2026)
+
+**Applied:** thinner discs (`0.18`, `w·0.95` via a `squash` term), brightness boost `(1 + 0.6·discW)` mid-morph, vortex easing `(morph − 0.15) / 0.75`, and crisper rings with the squash window `smoothstep(0.15, 0.4, t) · (1 − smoothstep(0.88, 1.0, t))`. Start (s1.00) and end (s1.80, s2.40) states verified in `reference/captures/compare_discs2.jpg`. Remaining differences are subjective; tune further only if needed.
+
+**Original notes (kept for reference):**
 
 **Where it stands.** The last comparison is `reference/captures/compare_discs3.jpg` (top row: reference at 7.0, 7.5, 7.75, 8.0, 8.25 s; bottom row: ours at s1.20 … s1.55).
 - The slicing "cut" at the start already matches well.
@@ -587,7 +594,7 @@ export default function ParticlePortraitHero() {
 
 ### Step 8 — Final cleanup and build
 
-- Gate or remove the `window.__pp` debug hook in `src/main.js` before shipping. For example, only set it when `import.meta.env.DEV` is true or the URL contains `?debug`. If you gate it, update `tools/capture.mjs` to use that URL.
+- ✅ DONE: the `window.__pp` hook in `src/main.js` is set only when `import.meta.env.DEV` or the URL contains `?debug`. `tools/capture.mjs` now always adds `?debug`. Production capture verified at `reference/captures/prod_t3.60.png`.
 - Self-host the Inter font if you want no third-party requests. It currently loads from Google Fonts in `index.html`.
 - Delete `reference/debug/raw-depth-16.png` (stale).
 - Run `npm run build`. Check that the output has no console errors, a single canvas and smooth scrolling at both the 5173 and 4173 URLs.
