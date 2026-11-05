@@ -1,0 +1,22 @@
+{
+  "name": "aadhi-particle-portrait",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Interactive 3D particle portrait hero (Three.js + custom GLSL), standalone build ready for React integration.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "portrait:prepare": "node tools/prepare-portrait.mjs",
+    "reference:frames": "node tools/extract-frames.mjs",
+    "capture": "node tools/capture.mjs"
+  },
+  "dependencies": {
+    "gsap": "^3.15.1",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.6"
+  }
+}

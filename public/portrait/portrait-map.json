@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "channels": {
+    "r": "luminance (local contrast)",
+    "g": "depth, 255 = nearest",
+    "b": "subject matte"
+  },
+  "map": {
+    "width": 652,
+    "height": 640
+  },
+  "source": {
+    "width": 795,
+    "height": 485,
+    "crop": {
+      "left": 165,
+      "top": 21,
+      "width": 473,
+      "height": 464
+    }
+  },
+  "anchors": {
+    "headCenterX": 0.4339459931585071,
+    "headTop": 0.03879310344827586,
+    "neckY": 0.4978448275862069,
+    "subjectLeft": 0.03805496828752643,
+    "subjectRight": 0.9619450317124736,
+    "bottom": 1
+  }
+}
