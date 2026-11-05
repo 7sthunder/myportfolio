@@ -55,6 +55,7 @@ export const particleVertex = /* glsl */ `
   uniform float uHelixTime;
   uniform float uHelixRadius;
   uniform float uHelixLength;
+  uniform float uHelixLift;
   uniform float uSwirl;
   uniform float uSpherePhase;
   uniform vec3 uBands; // x = count, y = top (local y), z = band height
@@ -135,11 +136,15 @@ export const particleVertex = /* glsl */ `
     // along the helix) and the strands wind with uHelixTime, so the whole field turns as the
     // visitor scrolls. Blended by uWork, so the globe/portrait states are unchanged at uWork = 0.
     if (uWork > 0.0001) {
+      // Horizontal double helix along X (matches the reference's waveform): each particle sits
+      // on one of two strands half a turn apart, wound around the X axis. aWaveX is its position
+      // along the axis, and the whole helix slides sideways with uWork as the works scroll past.
+      float along = fract(aRandom.z * 31.7);
+      float slideX = (along - 0.5) * uHelixLength - uWork * uHelixLength * 0.15;
       float strand = step(0.5, fract(aRandom.w * 17.3));
-      float along = (fract(aRandom.z * 31.7) - 0.5) * uHelixLength;
-      float angle = along * 4.2 + uHelixTime + strand * PI;
-      float radius = uHelixRadius * (0.96 + 0.08 * fract(aRandom.x * 9.1));
-      vec3 helix = vec3(cos(angle) * radius, along, sin(angle) * radius * 0.35);
+      float angle = along * 11.0 + uHelixTime + strand * PI + aRandom.x * 0.12;
+      float radius = uHelixRadius * (0.85 + 0.3 * fract(aRandom.x * 9.1));
+      vec3 helix = vec3(slideX, sin(angle) * radius - uHelixLift, cos(angle) * radius);
       local = mix(local, helix, smoothstep(0.0, 1.0, uWork));
     }
 
@@ -213,6 +218,8 @@ export const particleVertex = /* glsl */ `
     float visible = mix(dustMote * 2.2, 1.0, smoothstep(0.1, 0.65, ef));
     float appear = smoothstep(aRandom.z * 0.65, aRandom.z * 0.65 + 0.35, uIntro);
     float bokeh = 1.0 + lens * (1.0 - ef) * 28.0;
+    // The DNA ribbon reads as a bright, crisp band (as in the reference), so it gets a boost.
+    b *= 1.0 + 1.6 * uWork;
     vAlpha = b * pe.y * bokeh * uBrightness * appear * visible;
     vTint = aRandom.y;
   }
