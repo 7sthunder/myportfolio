@@ -273,10 +273,15 @@ export const particleVertex = /* glsl */ `
       a, hw.y * 0.13, s, 4.0);
   }
 
-  // Assemble onto a text / element target along a swooping path; returns the blend weight.
-  float spell(inout vec3 p, vec2 target, float amount) {
+  // Assemble onto a text / element target along a swooping path. Particles land in a sweep from
+  // left to right (the DOM reveal mask in Journey.jsx follows the same front: SPELL_* constants),
+  // and each one melts into the solid text as it lands. Returns the blend weight; landed = 0..1.
+  float spell(inout vec3 p, vec2 target, float amount, inout float landed) {
     if (amount < 0.0001 || abs(target.x) > 1e3) return 0.0;
-    float t = clamp((amount - aRandom.w * 0.35) / 0.65, 0.0, 1.0);
+    float xn = clamp(target.x / (2.0 * uHalf.x) + 0.5, 0.0, 1.0);
+    float delay = 0.55 * xn + 0.1 * aRandom.w;
+    float t = clamp((amount - delay) / 0.35, 0.0, 1.0);
+    landed = max(landed, smoothstep(0.82, 1.0, t));
     float e = easeInOutCubic(t);
     vec3 to = vec3(target + aJourney.zw * 0.0025, 0.0);
     vec2 d = to.xy - p.xy;
@@ -331,7 +336,8 @@ export const particleVertex = /* glsl */ `
       shapeGlow = mix(1.0, g, t);
       edgeOn *= 1.0 - t;
     }
-    float spellW = spell(world.xyz, aSpell.xy, uExpSpell);
+    float landed = 0.0;
+    float spellW = spell(world.xyz, aSpell.xy, uExpSpell, landed);
     if (uAch > 0.0001) {
       float g;
       vec3 target = achievementPoint(g);
@@ -339,8 +345,9 @@ export const particleVertex = /* glsl */ `
       world.xyz = mix(world.xyz, target, t);
       shapeGlow = mix(shapeGlow, g, t);
       spellW *= 1.0 - t;
+      landed *= 1.0 - t;
     }
-    spellW = max(spellW, spell(world.xyz, aSpell.zw, uAchSpell));
+    spellW = max(spellW, spell(world.xyz, aSpell.zw, uAchSpell, landed));
     if (uFrame > 0.0001) {
       float t = clamp((uFrame - aRandom.w * 0.18) / 0.82, 0.0, 1.0);
       world.xyz = mix(world.xyz, framePoint(world.xyz), easeInOutCubic(t));
@@ -403,8 +410,10 @@ export const particleVertex = /* glsl */ `
     b *= 1.0 + post * (0.55 + 0.5 * aMap.w * (1.0 - smoothstep(0.0, 0.4, uDna)));
     b *= 1.0 + 0.9 * edgeOn * edgeOn * (1.0 - uCoil);
     b *= mix(shapeGlow, 1.0, uFrame);
-    // Formed letters read as bright, crisp glitter.
+    // Flying letters read as bright glitter; once landed they melt into the solid text, leaving
+    // a faint shimmer on it.
     b *= mix(1.0, 1.7, spellW * (1.0 - uFrame));
+    b *= mix(1.0, 0.16, landed * (1.0 - uFrame));
     b *= 0.86 + 0.14 * sin(uTime * (0.6 + aRandom.z * 2.4) + ph * 9.0);
 
     // The cursor doubles as a soft light: contours facing it catch more light.

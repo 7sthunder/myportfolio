@@ -596,19 +596,19 @@ html.pp-has-cursor * {
   inset: 0;
 }
 
-/* Staggered blur-in, matching the other overlay texts. */
+/* Condensed out of the particles: opacity and a mask that follows the particles' landing front
+   are driven from Journey.jsx, so the content never appears separately from them. */
 .pp-reveal {
   opacity: 0;
-  filter: blur(10px);
-  transition:
-    opacity 0.8s ease,
-    filter 0.8s ease;
-  transition-delay: var(--d, 0ms);
 }
 
-[data-active='true'] .pp-reveal {
+.pp-exp__node {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.pp-exp[data-active='true'] .pp-exp__node {
   opacity: 1;
-  filter: blur(0);
 }
 
 /* ---- experience */

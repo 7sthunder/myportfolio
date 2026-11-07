@@ -41,17 +41,17 @@ const T = (() => {
   // elements, the real text fades in as they dissolve, and on the way out it turns back to dust.
   t.expIn = t.tunnelDone + 0.35;
   t.expDone = t.expIn + 1.0;
-  t.expSpellIn = t.expDone - 0.45;
-  t.expSpellDone = t.expDone + 0.65;
-  t.expTextIn = t.expSpellDone - 0.05;
-  t.expTextOut = t.expSpellDone + 1.0;
-  t.achIn = t.expTextOut + 0.15;
+  t.expSpellIn = t.expDone - 0.4;
+  t.expSpellDone = t.expSpellIn + 1.15;
+  t.expOutIn = t.expSpellDone + 0.9;
+  t.expOutDone = t.expOutIn + 0.8;
+  t.achIn = t.expOutDone - 0.2;
   t.achDone = t.achIn + 1.0;
-  t.achSpellIn = t.achDone - 0.45;
-  t.achSpellDone = t.achDone + 0.65;
-  t.achTextIn = t.achSpellDone - 0.05;
-  t.achTextOut = t.achSpellDone + 1.1;
-  t.frameIn = t.achTextOut + 0.15;
+  t.achSpellIn = t.achDone - 0.4;
+  t.achSpellDone = t.achSpellIn + 1.15;
+  t.achOutIn = t.achSpellDone + 1.0;
+  t.achOutDone = t.achOutIn + 0.8;
+  t.frameIn = t.achOutDone - 0.2;
   t.frameDone = t.frameIn + 1.05;
   t.contactIn = t.frameIn + 0.65;
   t.end = t.frameDone + 0.35;
@@ -129,6 +129,31 @@ export default function Journey() {
     let fontsReady = false;
     document.fonts.ready.then(() => (fontsReady = true));
     const onResize = () => (portrait.spellDirty = true);
+
+    // Landing front of the particle sweep (must match spell() in the particle shader): a particle
+    // whose target sits at screen fraction x has fully landed once amount >= 0.55 x + 0.45.
+    const expParts = [...exp.current.querySelectorAll('.pp-reveal')].map((el) => ({ el, css: '' }));
+    const achParts = [...ach.current.querySelectorAll('.pp-reveal')].map((el) => ({ el, css: '' }));
+    const condense = (parts, amount) => {
+      const w = window.innerWidth;
+      const front = ((amount - 0.45) / 0.55) * w;
+      const feather = 0.12 * w;
+      for (const part of parts) {
+        const r = part.el.getBoundingClientRect();
+        const s = front - r.left;
+        let css;
+        if (amount <= 0 || s + feather <= 0) css = 'hidden';
+        else if (s >= r.width) css = 'solid';
+        else css = `linear-gradient(90deg, #000 ${s.toFixed(1)}px, transparent ${(s + feather).toFixed(1)}px)`;
+        if (css === part.css) continue;
+        part.css = css;
+        const { style } = part.el;
+        style.opacity = css === 'hidden' ? '0' : '1';
+        const mask = css === 'hidden' || css === 'solid' ? '' : css;
+        style.maskImage = mask;
+        style.webkitMaskImage = mask;
+      }
+    };
     window.addEventListener('resize', onResize);
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -142,11 +167,11 @@ export default function Journey() {
         .to(state, { coil: 1, duration: T.coilDone - T.coilIn }, T.coilIn)
         .to(state, { tunnel: 1, duration: T.tunnelDone - T.tunnelIn }, T.tunnelIn)
         .to(state, { experience: 1, duration: T.expDone - T.expIn }, T.expIn)
-        .to(state, { expSpell: 1, duration: T.expSpellDone - T.expSpellIn, ease: 'power1.inOut' }, T.expSpellIn)
+        .to(state, { expSpell: 1, duration: T.expSpellDone - T.expSpellIn }, T.expSpellIn)
+        .to(state, { expSpell: 0, duration: T.expOutDone - T.expOutIn }, T.expOutIn)
         .to(state, { achievements: 1, duration: T.achDone - T.achIn }, T.achIn)
-        .to(state, { expSpell: 0, duration: T.achDone - T.achIn }, T.achIn)
-        .to(state, { achSpell: 1, duration: T.achSpellDone - T.achSpellIn, ease: 'power1.inOut' }, T.achSpellIn)
-        .to(state, { achSpell: 0, duration: 0.6 }, T.frameIn + 0.4)
+        .to(state, { achSpell: 1, duration: T.achSpellDone - T.achSpellIn }, T.achSpellIn)
+        .to(state, { achSpell: 0, duration: T.achOutDone - T.achOutIn }, T.achOutIn)
         .to(state, { frame: 1, duration: T.frameDone - T.frameIn }, T.frameIn)
         .to({}, { duration: 0.001 }, T.end - 0.001);
 
@@ -160,14 +185,12 @@ export default function Journey() {
         set(statement.current, t >= T.statementIn && t < T.statementOut);
         set(kicker.current, t >= T.kickerIn && t < T.kickerOut);
         set(closing.current, t >= T.closingIn && t < T.closingOut);
-        const expOn = t >= T.expTextIn && t < T.expTextOut;
-        const achOn = t >= T.achTextIn && t < T.achTextOut;
-        set(exp.current, expOn);
-        set(ach.current, achOn);
-        // Formed particles dissolve while the real text fades in, and re-form when it leaves.
-        const k = 1 - Math.exp(-(deltaMs / 1000) * 2.2);
-        state.expRelease += ((expOn ? 1 : 0) - state.expRelease) * k;
-        state.achRelease += ((achOn ? 1 : 0) - state.achRelease) * k;
+        // The milestone sections are made of the particles: the solid content condenses exactly
+        // where they have landed, so there is only ever one copy on screen.
+        set(exp.current, state.expSpell > 0.5);
+        set(ach.current, state.achSpell > 0.5);
+        condense(expParts, state.expSpell);
+        condense(achParts, state.achSpell);
 
         // Formation targets come from the live layout; rebuild them when it (or density) changes.
         if (!building && portrait.spellDirty && t > T.expIn - 0.6 && t < T.frameIn && fontsReady) {
@@ -210,7 +233,7 @@ export default function Journey() {
       root.current?.classList.remove('pp-journey--gl');
       if (portrait.frameElement === card.current) portrait.frameElement = null;
       portrait.timelineAnchors = null;
-      Object.assign(state, { map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, expSpell: 0, expRelease: 0, achievements: 0, achSpell: 0, achRelease: 0, frame: 0 });
+      Object.assign(state, { map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, expSpell: 0, achievements: 0, achSpell: 0, frame: 0 });
     };
   }, [portrait]);
 
@@ -241,20 +264,20 @@ export default function Journey() {
 
         <section className="pp-exp" ref={exp} data-active="false" aria-labelledby="pp-exp-title">
           <div className="pp-exp__intro">
-            <p className="pp-exp__kicker pp-reveal" style={{ '--d': '0ms' }}>
+            <p className="pp-exp__kicker pp-reveal">
               My journey
             </p>
-            <h2 className="pp-exp__title pp-reveal" id="pp-exp-title" style={{ '--d': '90ms' }}>
+            <h2 className="pp-exp__title pp-reveal" id="pp-exp-title">
               Experience
             </h2>
-            <p className="pp-exp__lead pp-reveal" style={{ '--d': '180ms' }}>
+            <p className="pp-exp__lead pp-reveal">
               A glimpse into my professional journey so far.
             </p>
           </div>
           <div className="pp-exp__line" ref={expLine} />
           <ol className="pp-exp__items">
             {experience.map((item, i) => (
-              <li className="pp-exp__item pp-reveal" key={item.role} style={{ '--d': `${260 + i * 140}ms` }}>
+              <li className="pp-exp__item pp-reveal" key={item.role}>
                 <span className="pp-exp__node" ref={(el) => (expNodes.current[i] = el)} />
                 <span className="pp-exp__date">
                   <CalendarIcon />
@@ -268,22 +291,22 @@ export default function Journey() {
 
         <section className="pp-ach" ref={ach} data-active="false" aria-labelledby="pp-ach-title">
           <SilverDefs />
-          <div className="pp-ach__mark pp-reveal" style={{ '--d': '0ms' }} aria-hidden="true">
+          <div className="pp-ach__mark pp-reveal" aria-hidden="true">
             <span />
             <svg viewBox="0 0 24 24">
               <path d="M12 1.5c.8 6.2 4.3 9.7 10.5 10.5-6.2.8-9.7 4.3-10.5 10.5C11.2 16.3 7.7 12.8 1.5 12 7.7 11.2 11.2 7.7 12 1.5z" />
             </svg>
             <span />
           </div>
-          <h2 className="pp-ach__title pp-reveal" id="pp-ach-title" style={{ '--d': '80ms' }}>
+          <h2 className="pp-ach__title pp-reveal" id="pp-ach-title">
             Achievements
           </h2>
-          <p className="pp-ach__lead pp-reveal" style={{ '--d': '160ms' }}>
+          <p className="pp-ach__lead pp-reveal">
             Milestones that fuel my journey
           </p>
           <ul className="pp-ach__cards">
             {achievements.map((a, i) => (
-              <li className="pp-ach__card pp-reveal" key={`${a.date}-${a.venue}`} style={{ '--d': `${240 + i * 90}ms` }}>
+              <li className="pp-ach__card pp-reveal" key={`${a.date}-${a.venue}`}>
                 <span className="pp-ach__art">
                   <MilestoneIcon name={a.icon} />
                 </span>

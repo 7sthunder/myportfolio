@@ -85,11 +85,9 @@ export class ParticlePortrait {
       coil: 0,
       tunnel: 0,
       experience: 0,
-      expSpell: 0, // particles assemble into the experience text / elements
-      expRelease: 0, // ... and dissolve again once the real text is shown
+      expSpell: 0, // particles assemble into (and become) the experience text / elements
       achievements: 0,
       achSpell: 0,
-      achRelease: 0,
       frame: 0,
     };
     this.spellDirty = true; // formation targets need rebuilding (resize / density change)
@@ -544,8 +542,8 @@ export class ParticlePortrait {
     u.uMap.value = map;
     u.uExp.value = exp;
     u.uAch.value = ach;
-    u.uExpSpell.value = clamp(s.expSpell) * (1 - clamp(s.expRelease));
-    u.uAchSpell.value = clamp(s.achSpell) * (1 - clamp(s.achRelease));
+    u.uExpSpell.value = clamp(s.expSpell);
+    u.uAchSpell.value = clamp(s.achSpell);
     u.uHalf.value.set(L.halfWidth, L.halfHeight);
     u.uDna.value = dna;
     u.uFrame.value = frame;
