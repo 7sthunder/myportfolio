@@ -21,6 +21,11 @@ export class PortraitParticles {
     const journey = data.journey ?? { map: new Float32Array(data.count * 4), journey: new Float32Array(data.count * 4) };
     geometry.setAttribute('aMap', new THREE.BufferAttribute(journey.map, 4));
     geometry.setAttribute('aJourney', new THREE.BufferAttribute(journey.journey, 4));
+    // Text / element formation targets (world xy) for the experience (xy) and achievements (zw)
+    // sections; 1e4 = this particle is not part of the formation. Filled by setSpellTargets.
+    const spell = new THREE.BufferAttribute(new Float32Array(data.count * 4).fill(1e4), 4);
+    spell.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('aSpell', spell);
     geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
 
     this.count = data.count;
@@ -65,6 +70,8 @@ export class PortraitParticles {
       uNodes: { value: new THREE.Vector4(0, 1, 0, -1) },
       uNodeR: { value: 0.1 },
       uAch: { value: 0 },
+      uExpSpell: { value: 0 },
+      uAchSpell: { value: 0 },
       uFrame: { value: 0 },
       uFrameCenter: { value: new THREE.Vector2() },
       uFrameHalf: { value: new THREE.Vector2(3, 1) },

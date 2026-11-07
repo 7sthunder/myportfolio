@@ -7,7 +7,7 @@ import { computeLayout, DEFAULT_COMPOSITION } from './layout.js';
 import { PortraitParticles } from './PortraitParticles.js';
 import { createSampler, fetchPortraitMap } from './samplerClient.js';
 import { DEFAULT_SAMPLING, headTopLocal, particleBudget } from './sampling.js';
-import { clamp, damp, easeInOutCubic, lerp, smoothstep } from './utils.js';
+import { clamp, createRandom, damp, easeInOutCubic, lerp, smoothstep } from './utils.js';
 
 /** Pixels per local unit of the hero bust in the reference (1900x956); particle sizes scale from it. */
 const REFERENCE_PX_PER_UNIT = 458;
@@ -76,7 +76,23 @@ export class ParticlePortrait {
     this.options.composition = { ...DEFAULT_COMPOSITION, ...(options.composition ?? {}) };
     this.reducedMotion = this.options.reducedMotion ?? prefersReducedMotion();
 
-    this.state = { shift: 0, morph: 0, map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, achievements: 0, frame: 0 };
+    this.state = {
+      shift: 0,
+      morph: 0,
+      map: 0,
+      dna: 0,
+      flow: 0,
+      coil: 0,
+      tunnel: 0,
+      experience: 0,
+      expSpell: 0, // particles assemble into the experience text / elements
+      expRelease: 0, // ... and dissolve again once the real text is shown
+      achievements: 0,
+      achSpell: 0,
+      achRelease: 0,
+      frame: 0,
+    };
+    this.spellDirty = true; // formation targets need rebuilding (resize / density change)
     this.frameElement = null;
     this.timelineAnchors = null; // { line: Element, nodes: [Element, Element] }
     this.flowTime = 0;
@@ -255,6 +271,46 @@ export class ParticlePortrait {
     if (!this.particles || !this.size) return;
     const target = this.budgetFor(this.size.width, this.size.height) / this.particles.count;
     this.particles.setDensity(Math.min(1, target) * this.density);
+    this.spellDirty = true;
+  }
+
+  /**
+   * Assigns text / element formation targets for one section (slot 0 = experience,
+   * 1 = achievements) from a rasterised mask ({ width, height, points } in CSS px of the
+   * viewport, see experience/glyphTargets.js). Only drawn particles are used, and the particles
+   * that draw the timeline line / orbs (or the achievements orbit) keep their own job.
+   */
+  setSpellTargets(slot, raster) {
+    if (!this.particles || !this.layout) return;
+    const geo = this.particles.geometry;
+    const attr = geo.getAttribute('aSpell');
+    const a = attr.array;
+    const J = this.data.journey?.journey;
+    const count = this.particles.count;
+    const visible = Math.min(geo.drawRange.count, count);
+    const off = slot * 2;
+    for (let i = 0; i < count; i++) a[i * 4 + off] = a[i * 4 + off + 1] = 1e4;
+
+    const n = raster.points.length;
+    if (J && n) {
+      const keep = slot === 0 ? 0.1 : 0.07;
+      const eligible = [];
+      for (let i = 0; i < visible; i++) if (J[i * 4] >= keep) eligible.push(i);
+      // ~0.6 particles per ink pixel, but leave at least 40% of the scenery in place.
+      const share = Math.min(0.6, (n * 0.6) / Math.max(eligible.length, 1));
+      const rand = createRandom(31 + slot);
+      const { wpp } = this.layout;
+      const { width: W, height: H } = this.size;
+      for (const i of eligible) {
+        if (rand() > share) continue;
+        const p = raster.points[(rand() * n) | 0];
+        const px = (p % raster.width) + rand();
+        const py = Math.floor(p / raster.width) + rand();
+        a[i * 4 + off] = (px - W / 2) * wpp;
+        a[i * 4 + off + 1] = (H / 2 - py) * wpp;
+      }
+    }
+    attr.needsUpdate = true;
   }
 
   /** Cinematic formation: dust fades in, drifts, then condenses and focuses into the portrait. */
@@ -488,6 +544,8 @@ export class ParticlePortrait {
     u.uMap.value = map;
     u.uExp.value = exp;
     u.uAch.value = ach;
+    u.uExpSpell.value = clamp(s.expSpell) * (1 - clamp(s.expRelease));
+    u.uAchSpell.value = clamp(s.achSpell) * (1 - clamp(s.achRelease));
     u.uHalf.value.set(L.halfWidth, L.halfHeight);
     u.uDna.value = dna;
     u.uFrame.value = frame;

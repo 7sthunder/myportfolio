@@ -94,6 +94,8 @@ export const particleVertex = /* glsl */ `
   uniform vec4 uNodes;       // timeline orbs: xy, zw (world)
   uniform float uNodeR;
   uniform float uAch;        // experience -> achievements streak bands + orbit
+  uniform float uExpSpell;   // particles assemble into the experience text / elements
+  uniform float uAchSpell;   // ... and into the achievements text / cards / icons
   uniform float uFrame;      // coil / tunnel -> contact frame
   uniform vec2 uFrameCenter;
   uniform vec2 uFrameHalf;
@@ -105,6 +107,7 @@ export const particleVertex = /* glsl */ `
   attribute vec4 aShade;   // x = rim, y = feature edges, z = matte, w = depth
   attribute vec4 aMap;     // xyz = country target (normalised), w = coastline
   attribute vec4 aJourney; // x = along, y = across, zw = gaussian jitter
+  attribute vec4 aSpell;   // text formation targets: xy = experience, zw = achievements (1e4 = none)
 
   varying float vAlpha;
   varying float vSoft;
@@ -270,6 +273,20 @@ export const particleVertex = /* glsl */ `
       a, hw.y * 0.13, s, 4.0);
   }
 
+  // Assemble onto a text / element target along a swooping path; returns the blend weight.
+  float spell(inout vec3 p, vec2 target, float amount) {
+    if (amount < 0.0001 || abs(target.x) > 1e3) return 0.0;
+    float t = clamp((amount - aRandom.w * 0.35) / 0.65, 0.0, 1.0);
+    float e = easeInOutCubic(t);
+    vec3 to = vec3(target + aJourney.zw * 0.0025, 0.0);
+    vec2 d = to.xy - p.xy;
+    float side = aRandom.z < 0.5 ? -1.0 : 1.0;
+    p = mix(p, to, e);
+    p.xy += vec2(-d.y, d.x) * 0.22 * side * sin(PI * e) * (1.0 - e * 0.5);
+    p.z += sin(PI * e) * (aRandom.x - 0.5) * 0.8;
+    return e;
+  }
+
   void main() {
     float ph = aRandom.z * TAU;
 
@@ -314,13 +331,16 @@ export const particleVertex = /* glsl */ `
       shapeGlow = mix(1.0, g, t);
       edgeOn *= 1.0 - t;
     }
+    float spellW = spell(world.xyz, aSpell.xy, uExpSpell);
     if (uAch > 0.0001) {
       float g;
       vec3 target = achievementPoint(g);
       float t = easeInOutCubic(clamp((uAch - aRandom.w * 0.2) / 0.8, 0.0, 1.0));
       world.xyz = mix(world.xyz, target, t);
       shapeGlow = mix(shapeGlow, g, t);
+      spellW *= 1.0 - t;
     }
+    spellW = max(spellW, spell(world.xyz, aSpell.zw, uAchSpell));
     if (uFrame > 0.0001) {
       float t = clamp((uFrame - aRandom.w * 0.18) / 0.82, 0.0, 1.0);
       world.xyz = mix(world.xyz, framePoint(world.xyz), easeInOutCubic(t));
@@ -383,6 +403,8 @@ export const particleVertex = /* glsl */ `
     b *= 1.0 + post * (0.55 + 0.5 * aMap.w * (1.0 - smoothstep(0.0, 0.4, uDna)));
     b *= 1.0 + 0.9 * edgeOn * edgeOn * (1.0 - uCoil);
     b *= mix(shapeGlow, 1.0, uFrame);
+    // Formed letters read as bright, crisp glitter.
+    b *= mix(1.0, 1.7, spellW * (1.0 - uFrame));
     b *= 0.86 + 0.14 * sin(uTime * (0.6 + aRandom.z * 2.4) + ph * 9.0);
 
     // The cursor doubles as a soft light: contours facing it catch more light.

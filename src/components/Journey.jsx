@@ -5,6 +5,7 @@ import { achievements, experience } from '../data/milestones.js';
 import { site } from '../data/site.js';
 import { works } from '../data/works.js';
 import { splitText } from '../experience/text.js';
+import { rasteriseSection } from '../experience/glyphTargets.js';
 import { WorksCanvas } from '../experience/WorksCanvas.js';
 import { CalendarIcon, MilestoneIcon, SilverDefs } from './MilestoneIcons.jsx';
 import { usePortrait } from './ParticleBackground.jsx';
@@ -36,15 +37,21 @@ const T = (() => {
   t.tunnelIn = t.worksOut + 0.05;
   t.tunnelDone = t.worksOut + 1.3;
   t.closingOut = t.tunnelDone + 0.4;
+  // Each milestone section: the scene forms, part of the particles assemble into the text and
+  // elements, the real text fades in as they dissolve, and on the way out it turns back to dust.
   t.expIn = t.tunnelDone + 0.35;
   t.expDone = t.expIn + 1.0;
-  t.expTextIn = t.expIn + 0.7;
-  t.expTextOut = t.expDone + 1.0;
-  t.achIn = t.expDone + 1.05;
+  t.expSpellIn = t.expDone - 0.45;
+  t.expSpellDone = t.expDone + 0.65;
+  t.expTextIn = t.expSpellDone - 0.05;
+  t.expTextOut = t.expSpellDone + 1.0;
+  t.achIn = t.expTextOut + 0.15;
   t.achDone = t.achIn + 1.0;
-  t.achTextIn = t.achIn + 0.7;
-  t.achTextOut = t.achDone + 1.1;
-  t.frameIn = t.achDone + 1.15;
+  t.achSpellIn = t.achDone - 0.45;
+  t.achSpellDone = t.achDone + 0.65;
+  t.achTextIn = t.achSpellDone - 0.05;
+  t.achTextOut = t.achSpellDone + 1.1;
+  t.frameIn = t.achTextOut + 0.15;
   t.frameDone = t.frameIn + 1.05;
   t.contactIn = t.frameIn + 0.65;
   t.end = t.frameDone + 0.35;
@@ -117,6 +124,12 @@ export default function Journey() {
     }
 
     const works$ = { progress: 0 };
+    let alive = true;
+    let building = false;
+    let fontsReady = false;
+    document.fonts.ready.then(() => (fontsReady = true));
+    const onResize = () => (portrait.spellDirty = true);
+    window.addEventListener('resize', onResize);
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         defaults: { ease: 'none' },
@@ -129,7 +142,11 @@ export default function Journey() {
         .to(state, { coil: 1, duration: T.coilDone - T.coilIn }, T.coilIn)
         .to(state, { tunnel: 1, duration: T.tunnelDone - T.tunnelIn }, T.tunnelIn)
         .to(state, { experience: 1, duration: T.expDone - T.expIn }, T.expIn)
+        .to(state, { expSpell: 1, duration: T.expSpellDone - T.expSpellIn, ease: 'power1.inOut' }, T.expSpellIn)
         .to(state, { achievements: 1, duration: T.achDone - T.achIn }, T.achIn)
+        .to(state, { expSpell: 0, duration: T.achDone - T.achIn }, T.achIn)
+        .to(state, { achSpell: 1, duration: T.achSpellDone - T.achSpellIn, ease: 'power1.inOut' }, T.achSpellIn)
+        .to(state, { achSpell: 0, duration: 0.6 }, T.frameIn + 0.4)
         .to(state, { frame: 1, duration: T.frameDone - T.frameIn }, T.frameIn)
         .to({}, { duration: 0.001 }, T.end - 0.001);
 
@@ -143,8 +160,31 @@ export default function Journey() {
         set(statement.current, t >= T.statementIn && t < T.statementOut);
         set(kicker.current, t >= T.kickerIn && t < T.kickerOut);
         set(closing.current, t >= T.closingIn && t < T.closingOut);
-        set(exp.current, t >= T.expTextIn && t < T.expTextOut);
-        set(ach.current, t >= T.achTextIn && t < T.achTextOut);
+        const expOn = t >= T.expTextIn && t < T.expTextOut;
+        const achOn = t >= T.achTextIn && t < T.achTextOut;
+        set(exp.current, expOn);
+        set(ach.current, achOn);
+        // Formed particles dissolve while the real text fades in, and re-form when it leaves.
+        const k = 1 - Math.exp(-(deltaMs / 1000) * 2.2);
+        state.expRelease += ((expOn ? 1 : 0) - state.expRelease) * k;
+        state.achRelease += ((achOn ? 1 : 0) - state.achRelease) * k;
+
+        // Formation targets come from the live layout; rebuild them when it (or density) changes.
+        if (!building && portrait.spellDirty && t > T.expIn - 0.6 && t < T.frameIn && fontsReady) {
+          building = true;
+          portrait.spellDirty = false;
+          Promise.all([
+            rasteriseSection(exp.current, { outline: '.pp-exp__date' }),
+            rasteriseSection(ach.current, { outline: '.pp-ach__card', rule: '.pp-ach__rule, .pp-ach__mark span' }),
+          ])
+            .then(([e, a]) => {
+              if (!alive) return;
+              portrait.setSpellTargets(0, e);
+              portrait.setSpellTargets(1, a);
+            })
+            .catch(() => {})
+            .finally(() => (building = false));
+        }
         set(contact.current, t >= T.contactIn);
 
         const active = t > T.worksIn - 0.05 && t < T.worksOut + 0.05;
@@ -163,12 +203,14 @@ export default function Journey() {
     });
 
     return () => {
+      alive = false;
+      window.removeEventListener('resize', onResize);
       ctx.revert();
       gl?.dispose();
       root.current?.classList.remove('pp-journey--gl');
       if (portrait.frameElement === card.current) portrait.frameElement = null;
       portrait.timelineAnchors = null;
-      Object.assign(state, { map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, achievements: 0, frame: 0 });
+      Object.assign(state, { map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, expSpell: 0, expRelease: 0, achievements: 0, achSpell: 0, achRelease: 0, frame: 0 });
     };
   }, [portrait]);
 
