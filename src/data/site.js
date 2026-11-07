@@ -2,6 +2,6 @@
 export const site = {
   name: 'Aadhi Narayanan',
   basedIn: 'India',
-  email: 'hello@example.com',
-  linkedin: 'https://www.linkedin.com/',
+  email: 'aadhinarayanan23r@gmail.com',
+  linkedin: 'https://www.linkedin.com/in/aadhi-narayanan-80093332a',
 };
