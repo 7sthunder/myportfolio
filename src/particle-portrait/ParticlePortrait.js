@@ -61,7 +61,9 @@ export const DEFAULT_OPTIONS = {
  *   portrait.state.flow = radians;    // ribbon phase (scroll driven, added to time)
  *   portrait.state.coil = 0..1;       // ribbon -> coil
  *   portrait.state.tunnel = 0..1;     // coil turns to face the camera (tunnel)
- *   portrait.state.frame = 0..1;      // tunnel -> frame around portrait.frameElement
+ *   portrait.state.experience = 0..1; // tunnel -> timeline around portrait.timelineAnchors
+ *   portrait.state.achievements = 0..1; // timeline -> corner currents
+ *   portrait.state.frame = 0..1;      // -> frame around portrait.frameElement
  *   portrait.dispose();
  *
  * Nothing here touches framework state: scroll/pointer inputs are plain fields read by the
@@ -74,8 +76,9 @@ export class ParticlePortrait {
     this.options.composition = { ...DEFAULT_COMPOSITION, ...(options.composition ?? {}) };
     this.reducedMotion = this.options.reducedMotion ?? prefersReducedMotion();
 
-    this.state = { shift: 0, morph: 0, map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, frame: 0 };
+    this.state = { shift: 0, morph: 0, map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, achievements: 0, frame: 0 };
     this.frameElement = null;
+    this.timelineAnchors = null; // { line: Element, nodes: [Element, Element] }
     this.flowTime = 0;
     this.anim = { intro: 0, formation: 0, blur: 0, aperture: this.options.introAperture };
     this.time = 0;
@@ -479,8 +482,13 @@ export class ParticlePortrait {
     const coil = easeInOutCubic(clamp(s.coil));
     const tunnel = easeInOutCubic(clamp(s.tunnel));
     const frame = clamp(s.frame);
+    const exp = clamp(s.experience);
+    const ach = clamp(s.achievements);
 
     u.uMap.value = map;
+    u.uExp.value = exp;
+    u.uAch.value = ach;
+    u.uHalf.value.set(L.halfWidth, L.halfHeight);
     u.uDna.value = dna;
     u.uFrame.value = frame;
     u.uCoil.value = coil;
@@ -490,7 +498,12 @@ export class ParticlePortrait {
     u.uMapScale.value = (mapPx * L.wpp) / L.globe.s;
 
     // The map defocuses as it dissolves; the ribbon sharpens as it condenses.
-    u.uBlur.value = this.anim.blur + 5 * bump(dna, 0.04, 0.3, 0.45, 0.9) + 2.5 * bump(frame, 0.0, 0.35, 0.5, 0.95);
+    u.uBlur.value =
+      this.anim.blur +
+      5 * bump(dna, 0.04, 0.3, 0.45, 0.9) +
+      3 * bump(exp, 0.0, 0.35, 0.5, 0.95) +
+      3 * bump(ach, 0.0, 0.35, 0.5, 0.95) +
+      2.5 * bump(frame, 0.0, 0.35, 0.5, 0.95);
 
     if (dna <= 0) return;
     if (!this.reducedMotion) this.flowTime += dt * (0.22 + 0.25 * tunnel);
@@ -528,6 +541,20 @@ export class ParticlePortrait {
     u.uLoops.value = lerp(lerp(0, 5.5, coil), 10, tunnel);
     u.uCoilRadius.value = lerp(k * 0.32 * coil, k * 0.6, tunnel);
     u.uRibbonWidth.value = lerp(lerp(k * 0.3, k * 0.17, coil), k * 0.14, tunnel);
+
+    // Experience timeline: the particle line and orbs follow their DOM anchors.
+    const anchors = this.timelineAnchors;
+    if (exp > 0 && anchors?.line) {
+      const c = this.renderer.domElement.getBoundingClientRect();
+      const wx = (x) => (x - c.left - c.width / 2) * L.wpp;
+      const wy = (y) => (c.top + c.height / 2 - y) * L.wpp;
+      const line = anchors.line.getBoundingClientRect();
+      u.uLine.value.set(wx(line.left + line.width / 2), wy(line.top), wy(line.bottom));
+      const [a0, a1] = anchors.nodes.map((el) => el.getBoundingClientRect());
+      u.uNodes.value.set(wx(a0.left + a0.width / 2), wy(a0.top + a0.height / 2), wx(a1.left + a1.width / 2), wy(a1.top + a1.height / 2));
+      // offsetWidth: the anchor's own size, ignoring the CSS halo's scale.
+      u.uNodeR.value = Math.max(anchors.nodes[0].offsetWidth / 2, 6) * L.wpp;
+    }
 
     if (frame > 0 && this.frameElement) {
       const r = this.frameElement.getBoundingClientRect();

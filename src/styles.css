@@ -442,7 +442,7 @@ html.pp-has-cursor * {
 
 .pp-contact__email {
   color: var(--pp-fg);
-  font-size: clamp(26px, 4.25vw, 96px);
+  font-size: clamp(22px, 3.4vw, 80px);
   font-weight: 400;
   line-height: 1.05;
   letter-spacing: -0.035em;
@@ -571,7 +571,7 @@ html.pp-has-cursor * {
   }
 
   .pp-contact__email {
-    font-size: clamp(18px, 6.6vw, 40px);
+    font-size: clamp(16px, 5.2vw, 34px);
   }
 
   .pp-contact__alt {
@@ -585,5 +585,483 @@ html.pp-has-cursor * {
     gap: 0.8em;
     font-size: clamp(9px, 2.6vw, 12px);
     text-align: center;
+  }
+}
+
+/* ---------------------------------------------------------------- experience + achievements */
+
+.pp-exp,
+.pp-ach {
+  position: absolute;
+  inset: 0;
+}
+
+/* Staggered blur-in, matching the other overlay texts. */
+.pp-reveal {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(0.6vw);
+  transition:
+    opacity 0.7s ease,
+    filter 0.7s ease,
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+
+[data-active='true'] .pp-reveal {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+}
+
+/* ---- experience */
+
+.pp-exp__intro {
+  position: absolute;
+  top: 31vh;
+  left: 11.4vw;
+}
+
+.pp-exp__kicker {
+  display: flex;
+  align-items: center;
+  gap: 1.3vw;
+  margin: 0;
+  color: var(--pp-muted);
+  font-size: clamp(11px, 1.05vw, 20px);
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+}
+
+.pp-exp__kicker::after {
+  content: '';
+  width: 8.4vw;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(238, 238, 242, 0.45), rgba(238, 238, 242, 0.12));
+}
+
+.pp-exp__title,
+.pp-ach__title {
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  color: transparent;
+  background: linear-gradient(90deg, #ffffff 0%, #f1f1f4 58%, #8e8e96 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.pp-exp__title {
+  margin-top: 0.9vw;
+  font-size: clamp(44px, 6.1vw, 132px);
+  line-height: 1.08;
+}
+
+.pp-exp__lead {
+  max-width: 22vw;
+  margin: 1.9vw 0 0;
+  color: rgba(238, 238, 242, 0.55);
+  font-size: clamp(14px, 1.45vw, 30px);
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+}
+
+.pp-exp__line {
+  position: absolute;
+  top: 16vh;
+  left: 54.7vw;
+  width: 1px;
+  height: 66vh;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.5) 20%, rgba(255, 255, 255, 0.5) 80%, transparent);
+  opacity: 0;
+  transition: opacity 0.8s ease 0.2s;
+}
+
+.pp-exp[data-active='true'] .pp-exp__line {
+  opacity: 0.45;
+}
+
+.pp-exp__items {
+  position: absolute;
+  top: 0;
+  left: 54.7vw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-exp__item {
+  position: absolute;
+  top: 33.6vh;
+  left: 0;
+}
+
+.pp-exp__item + .pp-exp__item {
+  top: 58.5vh;
+}
+
+/* Anchor for the particle orb; the CSS only adds a soft halo behind it. */
+.pp-exp__node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2.6vw;
+  height: 2.6vw;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 45%, transparent 70%);
+  transform: translate(-50%, -50%) scale(2);
+}
+
+.pp-exp__date {
+  position: absolute;
+  top: 0;
+  left: 4.85vw;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85vw;
+  height: 3.25vw;
+  padding: 0 1.55vw 0 1.4vw;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(238, 238, 242, 0.88);
+  font-size: clamp(12px, 1.3vw, 27px);
+  white-space: nowrap;
+  transform: translateY(-50%);
+  backdrop-filter: blur(6px);
+}
+
+.pp-exp__cal {
+  width: 1.45vw;
+  height: 1.45vw;
+  color: rgba(238, 238, 242, 0.75);
+}
+
+.pp-exp__role {
+  position: absolute;
+  top: 2.6vw;
+  left: 5.75vw;
+  margin: 0;
+  color: var(--pp-fg);
+  font-size: clamp(16px, 2vw, 42px);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+/* ---- achievements */
+
+.pp-ach {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 4vh;
+}
+
+.pp-ach__mark {
+  display: flex;
+  align-items: center;
+  gap: 1.6vw;
+}
+
+.pp-ach__mark span {
+  width: 10.2vw;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4));
+}
+
+.pp-ach__mark span:last-child {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.4), transparent);
+}
+
+.pp-ach__mark svg {
+  width: 1.9vw;
+  height: 1.9vw;
+  fill: #fff;
+  filter: drop-shadow(0 0 0.6vw rgba(255, 255, 255, 0.6));
+}
+
+.pp-ach__title {
+  margin-top: 1.5vw;
+  font-size: clamp(36px, 4.4vw, 96px);
+  line-height: 1.1;
+  background: linear-gradient(90deg, #ffffff 0%, #ffffff 52%, #9a9aa2 62%, #8a8a92 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.pp-ach__lead {
+  margin: 0.9vw 0 0;
+  padding-left: 0.55em;
+  color: rgba(238, 238, 242, 0.36);
+  font-size: clamp(10px, 0.92vw, 19px);
+  letter-spacing: 0.55em;
+  text-transform: uppercase;
+}
+
+.pp-ach__cards {
+  display: flex;
+  gap: 1.25vw;
+  margin: 3.7vw 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-ach__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 17.4vw;
+  min-height: 20.8vw;
+  padding: 1.9vw 1.3vw 3vw;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.15vw;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1.5vw 3vw rgba(0, 0, 0, 0.35);
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+/* Highlights along the top edge and under the bottom edge of the glass. */
+.pp-ach__card::before,
+.pp-ach__card::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 40%;
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+}
+
+.pp-ach__card::before {
+  top: -1px;
+}
+
+.pp-ach__card::after {
+  bottom: -1px;
+  width: 30%;
+  box-shadow: 0 0 1.2vw 0.2vw rgba(255, 255, 255, 0.25);
+}
+
+.pp-ach__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 6.3vw;
+}
+
+.pp-ach__art::after {
+  content: '';
+  position: absolute;
+  bottom: -0.5vw;
+  left: 50%;
+  width: 5vw;
+  height: 0.8vw;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.35), transparent 70%);
+  transform: translateX(-50%);
+}
+
+.pp-ach__icon {
+  width: 5.6vw;
+  height: 5.6vw;
+  filter: drop-shadow(0 0 0.5vw rgba(255, 255, 255, 0.28));
+}
+
+.pp-ach__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pp-ach__date {
+  margin-top: 1.9vw;
+  color: rgba(238, 238, 242, 0.62);
+  font-size: clamp(10px, 0.98vw, 20px);
+  letter-spacing: 0.18em;
+}
+
+.pp-ach__what {
+  margin-top: 0.9vw;
+  color: rgba(238, 238, 242, 0.85);
+  font-size: clamp(12px, 1.2vw, 25px);
+  letter-spacing: -0.01em;
+}
+
+.pp-ach__what strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.pp-ach__detail {
+  margin-top: 0.35vw;
+  color: rgba(238, 238, 242, 0.68);
+  font-size: clamp(10px, 1.02vw, 21px);
+  line-height: 1.5;
+}
+
+.pp-ach__rule {
+  position: absolute;
+  bottom: 1.3vw;
+  left: 50%;
+  width: 3.4vw;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.45);
+  transform: translateX(-50%);
+}
+
+@media (max-aspect-ratio: 85/100) {
+  .pp-exp__intro {
+    top: 12vh;
+    left: var(--pp-gutter);
+  }
+
+  .pp-exp__kicker {
+    font-size: 3vw;
+  }
+
+  .pp-exp__kicker::after {
+    width: 14vw;
+  }
+
+  .pp-exp__title {
+    margin-top: 2vw;
+    font-size: 15vw;
+  }
+
+  .pp-exp__lead {
+    max-width: 80vw;
+    margin-top: 3vw;
+    font-size: 4.2vw;
+  }
+
+  .pp-exp__line {
+    top: 44vh;
+    left: 9vw;
+    height: 48vh;
+  }
+
+  .pp-exp__items {
+    left: 9vw;
+  }
+
+  .pp-exp__item {
+    top: 54vh;
+  }
+
+  .pp-exp__item + .pp-exp__item {
+    top: 74vh;
+  }
+
+  .pp-exp__node {
+    width: 7vw;
+    height: 7vw;
+  }
+
+  .pp-exp__date {
+    left: 8vw;
+    gap: 2vw;
+    height: 9vw;
+    padding: 0 4vw 0 3.6vw;
+    font-size: 3.6vw;
+  }
+
+  .pp-exp__cal {
+    width: 4vw;
+    height: 4vw;
+  }
+
+  .pp-exp__role {
+    top: 7vw;
+    left: 9vw;
+    width: 76vw;
+    font-size: 5.2vw;
+    white-space: normal;
+  }
+
+  .pp-ach {
+    padding-bottom: 0;
+  }
+
+  .pp-ach__mark span {
+    width: 18vw;
+  }
+
+  .pp-ach__mark svg {
+    width: 4.5vw;
+    height: 4.5vw;
+  }
+
+  .pp-ach__title {
+    margin-top: 2.5vw;
+    font-size: 11vw;
+  }
+
+  .pp-ach__lead {
+    margin-top: 2vw;
+    font-size: 2.3vw;
+    letter-spacing: 0.38em;
+  }
+
+  .pp-ach__cards {
+    flex-direction: column;
+    gap: 2.2vw;
+    margin-top: 6vw;
+  }
+
+  .pp-ach__card {
+    flex-direction: row;
+    align-items: center;
+    gap: 4vw;
+    width: 90vw;
+    min-height: 0;
+    padding: 3vw 4vw;
+    border-radius: 3vw;
+    text-align: left;
+  }
+
+  .pp-ach__art {
+    flex: none;
+    height: auto;
+  }
+
+  .pp-ach__art::after {
+    bottom: -1.5vw;
+    width: 10vw;
+    height: 2vw;
+  }
+
+  .pp-ach__icon {
+    width: 12vw;
+    height: 12vw;
+  }
+
+  .pp-ach__body {
+    align-items: flex-start;
+  }
+
+  .pp-ach__date {
+    margin-top: 0;
+    font-size: 2.8vw;
+  }
+
+  .pp-ach__what {
+    margin-top: 0.8vw;
+    font-size: 3.7vw;
+  }
+
+  .pp-ach__detail {
+    margin-top: 0.4vw;
+    font-size: 3vw;
+    line-height: 1.4;
+  }
+
+  .pp-ach__rule {
+    display: none;
   }
 }

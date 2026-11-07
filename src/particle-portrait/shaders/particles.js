@@ -88,6 +88,12 @@ export const particleVertex = /* glsl */ `
   uniform float uCoil;       // ribbon cross-section -> radial (coil bands)
   uniform float uCoilRadius;
   uniform float uLoops;
+  uniform vec2 uHalf;        // half viewport size at z = 0 (world)
+  uniform float uExp;        // tunnel -> experience timeline (line + orbs) and dunes
+  uniform vec3 uLine;        // timeline: x, top y, bottom y (world)
+  uniform vec4 uNodes;       // timeline orbs: xy, zw (world)
+  uniform float uNodeR;
+  uniform float uAch;        // experience -> achievements streak bands + orbit
   uniform float uFrame;      // coil / tunnel -> contact frame
   uniform vec2 uFrameCenter;
   uniform vec2 uFrameHalf;
@@ -188,13 +194,80 @@ export const particleVertex = /* glsl */ `
 
   vec3 framePoint(vec3 from) {
     vec2 rel = from.xy - uFrameCenter;
+    // Ordered by angle so a centred shape collapses radially; from the corner currents of the
+    // achievements every particle takes its own slot instead, so the band fills evenly.
     float q = fract(atan(rel.y, rel.x) / TAU + 1.0);
+    q = mix(q, fract(aJourney.x * 17.31 + aRandom.w), step(0.5, uAch));
     vec4 e = rectPoint(q, uFrameHalf);
     // Band: even fill across its width with a soft, fuzzy outer edge; slightly heavier on the
     // right side, like the reference's perspective.
     float band = uFrameBand * (1.0 + 0.25 * smoothstep(-uFrameHalf.x, uFrameHalf.x, e.x));
     float across = (fract(aJourney.x * 37.13 + aRandom.z) - 0.5) * band + abs(aJourney.w) * band * 0.16;
     return vec3(uFrameCenter + e.xy + e.zw * across, aJourney.z * 0.02);
+  }
+
+  // A soft band of particles along a quadratic curve (p0 -> p2, bent towards p1). s is the
+  // offset across the band in band widths; the band ripples slowly, like drifting sand.
+  vec3 bandPoint(vec2 p0, vec2 p1, vec2 p2, float a, float width, float s, float seed) {
+    vec2 c = mix(mix(p0, p1, a), mix(p1, p2, a), a);
+    vec2 d = normalize(2.0 * (1.0 - a) * (p1 - p0) + 2.0 * a * (p2 - p1) + vec2(1e-5));
+    vec2 n = vec2(-d.y, d.x);
+    float ripple = sin(a * 13.0 + uTime * 0.45 + seed) * 0.3 + sin(a * 29.0 - uTime * 0.6 + seed * 2.0) * 0.12;
+    return vec3(c + n * width * (s + ripple), aJourney.z * 0.45);
+  }
+
+  // Experience: a crisp vertical timeline, a glittering orb on each role, and a dune of sand
+  // sweeping from the left edge along the bottom of the screen. glow = brightness factor.
+  vec3 experiencePoint(out float glow) {
+    float u = aJourney.x;
+    float h = fract(u * 91.7 + aRandom.z * 13.1);
+    if (u < 0.045) {
+      glow = 1.5 * smoothstep(0.0, 0.2, h) * (1.0 - smoothstep(0.8, 1.0, h)) + 0.1;
+      return vec3(uLine.x + aJourney.w * uNodeR * 0.02, mix(uLine.z, uLine.y, h), aJourney.z * 0.02);
+    }
+    if (u < 0.1) {
+      vec2 c = h < 0.5 ? uNodes.xy : uNodes.zw;
+      float th = fract(h * 37.9) * TAU;
+      float cz = fract(u * 113.3) * 2.0 - 1.0;
+      vec3 dir = vec3(sqrt(1.0 - cz * cz) * vec2(cos(th), sin(th)), cz);
+      float shell = step(fract(u * 53.1), 0.55);
+      float r = uNodeR * mix(1.0 + abs(aJourney.w) * 1.4, pow(fract(u * 7.7), 0.25), shell);
+      glow = mix(0.7, 1.7, shell);
+      return vec3(c, 0.0) + dir * r * vec3(1.0, 1.0, 0.4);
+    }
+    float a = pow(fract(u * 7.31), 1.25);
+    vec2 hw = uHalf;
+    glow = 0.95;
+    return bandPoint(vec2(-1.2 * hw.x, 0.05 * hw.y), vec2(-0.5 * hw.x, -1.35 * hw.y), vec2(1.2 * hw.x, -0.75 * hw.y),
+      a, hw.y * 0.17, aJourney.w * 0.55 - 0.15, 0.0);
+  }
+
+  // Achievements: streaky particle currents in the top-left and bottom-right corners and a
+  // faint tilted orbit around the title.
+  vec3 achievementPoint(out float glow) {
+    float u = aJourney.x;
+    float h = fract(u * 91.7 + aRandom.z * 13.1);
+    vec2 hw = uHalf;
+    if (u < 0.07) {
+      float t = h * TAU;
+      vec2 e = vec2(cos(t) * 0.74 * hw.x, sin(t) * 0.66 * hw.y);
+      float r = -0.2;
+      e = mat2(cos(r), sin(r), -sin(r), cos(r)) * e;
+      glow = 0.45;
+      return vec3(e + vec2(0.0, 0.08 * hw.y) + aJourney.w * 0.008, aJourney.z * 0.03);
+    }
+    // Streaks: the edge-weighted across value draws distinct strands inside each current.
+    float s = aJourney.y * 0.5 + aJourney.w * 0.18;
+    if (u < 0.52) {
+      float a = fract(u * 5.17);
+      glow = 1.15;
+      return bandPoint(vec2(-1.2 * hw.x, 0.72 * hw.y), vec2(-0.45 * hw.x, 0.58 * hw.y), vec2(0.12 * hw.x, 1.15 * hw.y),
+        a, hw.y * 0.1, s, 2.0);
+    }
+    float a = fract(u * 3.73);
+    glow = 1.0;
+    return bandPoint(vec2(-0.2 * hw.x, -1.2 * hw.y), vec2(0.45 * hw.x, -0.72 * hw.y), vec2(1.2 * hw.x, -0.7 * hw.y),
+      a, hw.y * 0.13, s, 4.0);
   }
 
   void main() {
@@ -231,6 +304,22 @@ export const particleVertex = /* glsl */ `
       ) * 0.06 * sin(PI * t);
       world.xyz = mix(world.xyz, ribbon + cloud, easeInOutCubic(leave));
       edgeOn *= settle;
+    }
+    float shapeGlow = 1.0;
+    if (uExp > 0.0001) {
+      float g;
+      vec3 target = experiencePoint(g);
+      float t = easeInOutCubic(clamp((uExp - aRandom.w * 0.2) / 0.8, 0.0, 1.0));
+      world.xyz = mix(world.xyz, target, t);
+      shapeGlow = mix(1.0, g, t);
+      edgeOn *= 1.0 - t;
+    }
+    if (uAch > 0.0001) {
+      float g;
+      vec3 target = achievementPoint(g);
+      float t = easeInOutCubic(clamp((uAch - aRandom.w * 0.2) / 0.8, 0.0, 1.0));
+      world.xyz = mix(world.xyz, target, t);
+      shapeGlow = mix(shapeGlow, g, t);
     }
     if (uFrame > 0.0001) {
       float t = clamp((uFrame - aRandom.w * 0.18) / 0.82, 0.0, 1.0);
@@ -293,6 +382,7 @@ export const particleVertex = /* glsl */ `
     b *= 1.0 + 0.6 * discW;
     b *= 1.0 + post * (0.55 + 0.5 * aMap.w * (1.0 - smoothstep(0.0, 0.4, uDna)));
     b *= 1.0 + 0.9 * edgeOn * edgeOn * (1.0 - uCoil);
+    b *= mix(shapeGlow, 1.0, uFrame);
     b *= 0.86 + 0.14 * sin(uTime * (0.6 + aRandom.z * 2.4) + ph * 9.0);
 
     // The cursor doubles as a soft light: contours facing it catch more light.

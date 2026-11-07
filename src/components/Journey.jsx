@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { achievements, experience } from '../data/milestones.js';
 import { site } from '../data/site.js';
 import { works } from '../data/works.js';
 import { splitText } from '../experience/text.js';
 import { WorksCanvas } from '../experience/WorksCanvas.js';
+import { CalendarIcon, MilestoneIcon, SilverDefs } from './MilestoneIcons.jsx';
 import { usePortrait } from './ParticleBackground.jsx';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -17,7 +19,9 @@ const base = import.meta.env.BASE_URL;
  *
  *   globe -> map of India ("Based in India" scrolls past) -> map dissolves into a twisted ribbon
  *   (statement) -> works slide across over the ribbon -> ribbon winds into a coil, then a tunnel
- *   ("And still working on plenty more.") -> tunnel collapses into the frame of the contact card.
+ *   ("And still working on plenty more.") -> the tunnel unravels into the experience timeline
+ *   (glowing line + orbs) -> corner currents behind the achievements -> the frame of the
+ *   contact card.
  */
 const WORKS_SPAN = works.length * 1.05 + 0.7;
 const T = (() => {
@@ -31,9 +35,17 @@ const T = (() => {
   t.closingIn = t.worksOut - 0.45;
   t.tunnelIn = t.worksOut + 0.05;
   t.tunnelDone = t.worksOut + 1.3;
-  t.frameIn = t.tunnelDone + 0.55;
+  t.closingOut = t.tunnelDone + 0.4;
+  t.expIn = t.tunnelDone + 0.35;
+  t.expDone = t.expIn + 1.0;
+  t.expTextIn = t.expIn + 0.7;
+  t.expTextOut = t.expDone + 1.0;
+  t.achIn = t.expDone + 1.05;
+  t.achDone = t.achIn + 1.0;
+  t.achTextIn = t.achIn + 0.7;
+  t.achTextOut = t.achDone + 1.1;
+  t.frameIn = t.achDone + 1.15;
   t.frameDone = t.frameIn + 1.05;
-  t.closingOut = t.frameIn + 0.05;
   t.contactIn = t.frameIn + 0.65;
   t.end = t.frameDone + 0.35;
   return t;
@@ -79,6 +91,10 @@ export default function Journey() {
   const closing = useRef(null);
   const contact = useRef(null);
   const card = useRef(null);
+  const exp = useRef(null);
+  const expLine = useRef(null);
+  const expNodes = useRef([]);
+  const ach = useRef(null);
   const media = useRef([]);
 
   useEffect(() => {
@@ -87,6 +103,7 @@ export default function Journey() {
     const reveal = [...splitText(contact.current.querySelector('.pp-contact__kicker')), ...splitText(contact.current.querySelector('.pp-contact__alt'))];
     reveal.forEach((el, i) => el.style.setProperty('--d', `${i * 18}ms`));
     portrait.frameElement = card.current;
+    portrait.timelineAnchors = { line: expLine.current, nodes: expNodes.current };
 
     let gl = null;
     try {
@@ -111,6 +128,8 @@ export default function Journey() {
         .to(works$, { progress: 1, duration: T.worksOut - T.worksIn }, T.worksIn)
         .to(state, { coil: 1, duration: T.coilDone - T.coilIn }, T.coilIn)
         .to(state, { tunnel: 1, duration: T.tunnelDone - T.tunnelIn }, T.tunnelIn)
+        .to(state, { experience: 1, duration: T.expDone - T.expIn }, T.expIn)
+        .to(state, { achievements: 1, duration: T.achDone - T.achIn }, T.achIn)
         .to(state, { frame: 1, duration: T.frameDone - T.frameIn }, T.frameIn)
         .to({}, { duration: 0.001 }, T.end - 0.001);
 
@@ -124,6 +143,8 @@ export default function Journey() {
         set(statement.current, t >= T.statementIn && t < T.statementOut);
         set(kicker.current, t >= T.kickerIn && t < T.kickerOut);
         set(closing.current, t >= T.closingIn && t < T.closingOut);
+        set(exp.current, t >= T.expTextIn && t < T.expTextOut);
+        set(ach.current, t >= T.achTextIn && t < T.achTextOut);
         set(contact.current, t >= T.contactIn);
 
         const active = t > T.worksIn - 0.05 && t < T.worksOut + 0.05;
@@ -146,7 +167,8 @@ export default function Journey() {
       gl?.dispose();
       root.current?.classList.remove('pp-journey--gl');
       if (portrait.frameElement === card.current) portrait.frameElement = null;
-      Object.assign(state, { map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, frame: 0 });
+      portrait.timelineAnchors = null;
+      Object.assign(state, { map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, achievements: 0, frame: 0 });
     };
   }, [portrait]);
 
@@ -174,6 +196,68 @@ export default function Journey() {
         <p className="pp-closing" ref={closing} data-active="false">
           And still working on plenty more.
         </p>
+
+        <section className="pp-exp" ref={exp} data-active="false" aria-labelledby="pp-exp-title">
+          <div className="pp-exp__intro">
+            <p className="pp-exp__kicker pp-reveal" style={{ '--d': '0ms' }}>
+              My journey
+            </p>
+            <h2 className="pp-exp__title pp-reveal" id="pp-exp-title" style={{ '--d': '90ms' }}>
+              Experience
+            </h2>
+            <p className="pp-exp__lead pp-reveal" style={{ '--d': '180ms' }}>
+              A glimpse into my professional journey so far.
+            </p>
+          </div>
+          <div className="pp-exp__line" ref={expLine} />
+          <ol className="pp-exp__items">
+            {experience.map((item, i) => (
+              <li className="pp-exp__item pp-reveal" key={item.role} style={{ '--d': `${260 + i * 140}ms` }}>
+                <span className="pp-exp__node" ref={(el) => (expNodes.current[i] = el)} />
+                <span className="pp-exp__date">
+                  <CalendarIcon />
+                  {item.date}
+                </span>
+                <h3 className="pp-exp__role">{item.role}</h3>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="pp-ach" ref={ach} data-active="false" aria-labelledby="pp-ach-title">
+          <SilverDefs />
+          <div className="pp-ach__mark pp-reveal" style={{ '--d': '0ms' }} aria-hidden="true">
+            <span />
+            <svg viewBox="0 0 24 24">
+              <path d="M12 1.5c.8 6.2 4.3 9.7 10.5 10.5-6.2.8-9.7 4.3-10.5 10.5C11.2 16.3 7.7 12.8 1.5 12 7.7 11.2 11.2 7.7 12 1.5z" />
+            </svg>
+            <span />
+          </div>
+          <h2 className="pp-ach__title pp-reveal" id="pp-ach-title" style={{ '--d': '80ms' }}>
+            Achievements
+          </h2>
+          <p className="pp-ach__lead pp-reveal" style={{ '--d': '160ms' }}>
+            Milestones that fuel my journey
+          </p>
+          <ul className="pp-ach__cards">
+            {achievements.map((a, i) => (
+              <li className="pp-ach__card pp-reveal" key={`${a.date}-${a.venue}`} style={{ '--d': `${240 + i * 90}ms` }}>
+                <span className="pp-ach__art">
+                  <MilestoneIcon name={a.icon} />
+                </span>
+                <span className="pp-ach__body">
+                  <span className="pp-ach__date">{a.date}</span>
+                  <span className="pp-ach__what">
+                    <strong>{a.result}</strong> {a.event}
+                  </span>
+                  {a.detail && <span className="pp-ach__detail">{a.detail}</span>}
+                  <span className="pp-ach__detail">({a.venue})</span>
+                </span>
+                <span className="pp-ach__rule" aria-hidden="true" />
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <div className="pp-contact" ref={contact} data-active="false">
           <div className="pp-contact__card" ref={card}>
