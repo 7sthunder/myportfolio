@@ -51,11 +51,6 @@ export const particleVertex = /* glsl */ `
   uniform vec3 uScatterOffset;
 
   uniform float uMorph;
-  uniform float uWork;
-  uniform float uHelixTime;
-  uniform float uHelixRadius;
-  uniform float uHelixLength;
-  uniform float uHelixLift;
   uniform float uSwirl;
   uniform float uSpherePhase;
   uniform vec3 uBands; // x = count, y = top (local y), z = band height
@@ -77,10 +72,33 @@ export const particleVertex = /* glsl */ `
   uniform float uDepthFade;
   uniform float uBrightness;
 
+  // Journey after the globe (see journey.js and ParticlePortrait.updateJourney).
+  uniform float uSphereRadius;
+  uniform float uMap;        // globe -> country map (local space)
+  uniform float uMapScale;   // local units per normalised map unit
+  uniform float uDna;        // map -> dust cloud -> twisted ribbon (world space)
+  uniform vec3 uAxisOrigin;  // ribbon / coil axis
+  uniform vec3 uAxisDir;
+  uniform vec3 uAxisN1;
+  uniform vec3 uAxisN2;
+  uniform float uAxisLength;
+  uniform float uRibbonWidth;
+  uniform float uTwist;      // ribbon turns along the axis
+  uniform float uFlow;       // ribbon / coil phase (time + scroll)
+  uniform float uCoil;       // ribbon cross-section -> radial (coil bands)
+  uniform float uCoilRadius;
+  uniform float uLoops;
+  uniform float uFrame;      // coil / tunnel -> contact frame
+  uniform vec2 uFrameCenter;
+  uniform vec2 uFrameHalf;
+  uniform float uFrameBand;
+
   attribute vec4 aSphere;  // xyz = globe target, w = horizontal slice index
   attribute vec3 aScatter; // normalised intro position
   attribute vec4 aRandom;  // x = size, y = brightness, z = phase, w = stagger
   attribute vec4 aShade;   // x = rim, y = feature edges, z = matte, w = depth
+  attribute vec4 aMap;     // xyz = country target (normalised), w = coastline
+  attribute vec4 aJourney; // x = along, y = across, zw = gaussian jitter
 
   varying float vAlpha;
   varying float vSoft;
@@ -117,6 +135,68 @@ export const particleVertex = /* glsl */ `
     return vec3(r * cos(th), y, r * sin(th));
   }
 
+  // Globe -> country. The globe is cut into horizontal slices that squash into thin discs and
+  // twist a little, then every particle glides to its spot on the map (matched by height, so
+  // the northern slices become the north of the country).
+  vec3 toMap(vec3 p, float m) {
+    const float SLICES = 6.0;
+    float sl = clamp(floor((aSphere.y / uSphereRadius * 0.5 + 0.5) * SLICES), 0.0, SLICES - 1.0);
+    float order = (SLICES - 1.0 - sl) / (SLICES - 1.0);
+    float t = clamp((m - order * 0.16 - aRandom.w * 0.08) / 0.76, 0.0, 1.0);
+    float center = ((sl + 0.5) / SLICES * 2.0 - 1.0) * uSphereRadius;
+    float squash = smoothstep(0.0, 0.3, t);
+    vec3 s = p;
+    s.y = mix(p.y, center + (p.y - center) * 0.2, squash);
+    float spin = sin(PI * smoothstep(0.0, 0.7, t)) * (mod(sl, 2.0) < 0.5 ? 0.55 : -0.55);
+    float cs = cos(spin);
+    float sn = sin(spin);
+    s.xz = mat2(cs, sn, -sn, cs) * s.xz;
+    vec3 target = vec3(aMap.xy, aMap.z) * uMapScale;
+    return mix(s, target, easeInOutCubic(smoothstep(0.22, 1.0, t)));
+  }
+
+  // Twisted ribbon along an axis; as uCoil grows the ribbon winds into a coil (helix of radius
+  // uCoilRadius) whose bands face the axis, so looking down the axis reads as a tunnel.
+  vec3 ribbonPoint(out float edgeOn) {
+    float u = aJourney.x;
+    float th = u * uTwist * TAU + uFlow;
+    float phi = u * uLoops * TAU + uFlow * 0.6;
+    vec3 twistAcross = uAxisN1 * cos(th) + uAxisN2 * sin(th);
+    vec3 radial = uAxisN1 * cos(phi) + uAxisN2 * sin(phi);
+    vec3 across = normalize(mix(twistAcross, radial, uCoil) + vec3(1e-4));
+    vec3 normal = normalize(cross(uAxisDir, across) + vec3(1e-4));
+    vec3 center = uAxisOrigin + uAxisDir * (u * uAxisLength) + radial * uCoilRadius;
+    // The flat ribbon catches more light where it turns edge-on to the viewer.
+    edgeOn = 1.0 - abs(normal.z);
+    return center + across * (aJourney.y * uRibbonWidth) + normal * (aJourney.z * uRibbonWidth * 0.045);
+  }
+
+  // Point on the contact frame (rounded band around a rectangle), ordered by angle around the
+  // frame centre so the tunnel collapses onto it radially. xy = point, zw = outward normal.
+  vec4 rectPoint(float q, vec2 h) {
+    float d = q * 4.0 * (h.x + h.y);
+    if (d < h.y) return vec4(h.x, d, 1.0, 0.0);
+    d -= h.y;
+    if (d < 2.0 * h.x) return vec4(h.x - d, h.y, 0.0, 1.0);
+    d -= 2.0 * h.x;
+    if (d < 2.0 * h.y) return vec4(-h.x, h.y - d, -1.0, 0.0);
+    d -= 2.0 * h.y;
+    if (d < 2.0 * h.x) return vec4(-h.x + d, -h.y, 0.0, -1.0);
+    d -= 2.0 * h.x;
+    return vec4(h.x, -h.y + d, 1.0, 0.0);
+  }
+
+  vec3 framePoint(vec3 from) {
+    vec2 rel = from.xy - uFrameCenter;
+    float q = fract(atan(rel.y, rel.x) / TAU + 1.0);
+    vec4 e = rectPoint(q, uFrameHalf);
+    // Band: even fill across its width with a soft, fuzzy outer edge; slightly heavier on the
+    // right side, like the reference's perspective.
+    float band = uFrameBand * (1.0 + 0.25 * smoothstep(-uFrameHalf.x, uFrameHalf.x, e.x));
+    float across = (fract(aJourney.x * 37.13 + aRandom.z) - 0.5) * band + abs(aJourney.w) * band * 0.16;
+    return vec3(uFrameCenter + e.xy + e.zw * across, aJourney.z * 0.02);
+  }
+
   void main() {
     float ph = aRandom.z * TAU;
 
@@ -130,25 +210,32 @@ export const particleVertex = /* glsl */ `
     vec3 local = position + drift;
     float discW = 0.0;
     if (uMorph > 0.0001) local = toSphere(local, uMorph, discW);
-
-    // Works section: the cloud gathers into a double helix (DNA) along the vertical axis. Each
-    // particle is pinned to one of two strands (aRandom.w picks the strand, aRandom.z the slot
-    // along the helix) and the strands wind with uHelixTime, so the whole field turns as the
-    // visitor scrolls. Blended by uWork, so the globe/portrait states are unchanged at uWork = 0.
-    if (uWork > 0.0001) {
-      // Horizontal double helix along X (matches the reference's waveform): each particle sits
-      // on one of two strands half a turn apart, wound around the X axis. aWaveX is its position
-      // along the axis, and the whole helix slides sideways with uWork as the works scroll past.
-      float along = fract(aRandom.z * 31.7);
-      float slideX = (along - 0.5) * uHelixLength - uWork * uHelixLength * 0.15;
-      float strand = step(0.5, fract(aRandom.w * 17.3));
-      float angle = along * 11.0 + uHelixTime + strand * PI + aRandom.x * 0.12;
-      float radius = uHelixRadius * (0.85 + 0.3 * fract(aRandom.x * 9.1));
-      vec3 helix = vec3(slideX, sin(angle) * radius - uHelixLift, cos(angle) * radius);
-      local = mix(local, helix, smoothstep(0.0, 1.0, uWork));
-    }
+    if (uMap > 0.0001) local = toMap(local, uMap);
 
     vec4 world = modelMatrix * vec4(local, 1.0);
+
+    // Map -> ribbon (world space): the map defocuses and spreads into a long drifting cloud
+    // around the ribbon, which then condenses onto it. Later the ribbon winds into a coil /
+    // tunnel and finally collapses onto the contact frame.
+    float edgeOn = 0.0;
+    if (uDna > 0.0001) {
+      vec3 ribbon = ribbonPoint(edgeOn);
+      float t = clamp((uDna - aRandom.w * 0.14) / 0.86, 0.0, 1.0);
+      float leave = smoothstep(0.0, 0.55, t);
+      float settle = smoothstep(0.3, 1.0, t);
+      vec3 cloud = aScatter * vec3(2.6, 0.75, 1.0) * uRibbonWidth * 1.6 * (1.0 - settle);
+      cloud += vec3(
+        sin(uTime * 0.3 + ph * 3.0),
+        cos(uTime * 0.27 + ph * 2.0),
+        sin(uTime * 0.23 + ph * 5.0)
+      ) * 0.06 * sin(PI * t);
+      world.xyz = mix(world.xyz, ribbon + cloud, easeInOutCubic(leave));
+      edgeOn *= settle;
+    }
+    if (uFrame > 0.0001) {
+      float t = clamp((uFrame - aRandom.w * 0.18) / 0.82, 0.0, 1.0);
+      world.xyz = mix(world.xyz, framePoint(world.xyz), easeInOutCubic(t));
+    }
 
     // Formation: dust -> portrait. Particles contract almost in unison (small stagger), so the
     // cloud reads as an out-of-focus silhouette that tightens and sharpens, as in the reference.
@@ -196,12 +283,16 @@ export const particleVertex = /* glsl */ `
 
     // Brightness: exponential distribution measured from the reference — a faint fill,
     // ~20% clearly visible specks and ~1-2% bright sparks — boosted along contours.
-    float rim = aShade.x;
+    // Portrait shading (rim, features, matte, depth) fades out once the cloud leaves the globe.
+    float post = smoothstep(0.0, 0.6, max(uMap, uDna));
+    float rim = aShade.x * (1.0 - post);
     float b = 0.003 + 0.085 * -log(1.0 - 0.9995 * aRandom.y);
-    b *= 1.0 + uRim * rim * rim + uFeature * aShade.y;
-    b *= mix(0.75, 1.0, aShade.z);
-    b *= mix(1.0 - uDepthFade, 1.0, aShade.w);
+    b *= 1.0 + uRim * rim * rim + uFeature * aShade.y * (1.0 - post);
+    b *= mix(mix(0.75, 1.0, aShade.z), 1.0, post);
+    b *= mix(mix(1.0 - uDepthFade, 1.0, aShade.w), 1.0, post);
     b *= 1.0 + 0.6 * discW;
+    b *= 1.0 + post * (0.55 + 0.5 * aMap.w * (1.0 - smoothstep(0.0, 0.4, uDna)));
+    b *= 1.0 + 0.9 * edgeOn * edgeOn * (1.0 - uCoil);
     b *= 0.86 + 0.14 * sin(uTime * (0.6 + aRandom.z * 2.4) + ph * 9.0);
 
     // The cursor doubles as a soft light: contours facing it catch more light.
@@ -218,8 +309,6 @@ export const particleVertex = /* glsl */ `
     float visible = mix(dustMote * 2.2, 1.0, smoothstep(0.1, 0.65, ef));
     float appear = smoothstep(aRandom.z * 0.65, aRandom.z * 0.65 + 0.35, uIntro);
     float bokeh = 1.0 + lens * (1.0 - ef) * 28.0;
-    // The DNA ribbon reads as a bright, crisp band (as in the reference), so it gets a boost.
-    b *= 1.0 + 1.6 * uWork;
     vAlpha = b * pe.y * bokeh * uBrightness * appear * visible;
     vTint = aRandom.y;
   }

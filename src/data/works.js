@@ -1,10 +1,12 @@
-// Works shown in the "My Featured Works" section. Screenshots live in public/works/.
+// Works shown in the "Some selected works" section. Screenshots live in public/works/.
+// tone = colour of the sheet framing the screenshot.
 export const works = [
   {
     title: 'CrossFit OS',
     info: 'Company project',
     tags: ['Astro', 'React', 'tRPC', 'PostgreSQL'],
     shot: 'crossfitos-landing.png',
+    tone: '#9fc41f',
     shotAlt: 'CrossFitOS landing page with the Website, Store and Community hero headline',
     live: 'https://crossfitos.com',
   },
@@ -13,6 +15,7 @@ export const works = [
     info: 'Company project',
     tags: ['React 19', 'TypeScript', 'tRPC', 'Drizzle', 'PostgreSQL', 'Cloudflare Workers', 'Tailwind CSS', 'Leaflet'],
     shot: 'tms-dashboard.png',
+    tone: '#c4581d',
     shotAlt: 'Transport Management System dashboard showing revenue against expenses, active drivers and available vehicles',
     live: 'https://tms.ascodelabs.com',
   },
@@ -21,6 +24,7 @@ export const works = [
     info: 'Company project',
     tags: ['React 19', 'tRPC', 'Cloudflare R2', 'PostgreSQL'],
     shot: 'asunique-dashboard.png',
+    tone: '#22409c',
     shotAlt: 'A S Unique Group recruitment dashboard showing deployed candidates, total candidates and on-going requirements',
     live: 'https://asuniquegroup.com/app',
   },
@@ -29,6 +33,7 @@ export const works = [
     info: 'Company project',
     tags: ['React', 'tRPC', 'Cloudflare D1', 'Drizzle'],
     shot: 'stamp-dashboard.png',
+    tone: '#1c2944',
     shotAlt: 'STAMP production dashboard showing job orders by status and orders over time',
     live: 'http://stamp-crm.ascodelabs.com/',
   },
@@ -37,6 +42,7 @@ export const works = [
     info: 'Independent',
     tags: ['Next.js', 'tRPC', 'PostgreSQL'],
     shot: 'meditrack-ai.png',
+    tone: '#1d6b4b',
     shotAlt: 'MediTrackAI landing page with the One secure vault headline and app preview',
   },
   {
@@ -44,6 +50,7 @@ export const works = [
     info: 'Independent',
     tags: ['Python', 'OpenCV', 'FastAPI', 'React'],
     shot: 'docuverify-dashboard.png',
+    tone: '#4a35b0',
     shotAlt: 'DocuVerify dashboard with the Verify Documents hero and an analysis summary showing a 62 out of 100 score',
   },
 ];

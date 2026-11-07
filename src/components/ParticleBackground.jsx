@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { countryOutline } from '../data/countryOutline.js';
 import { ParticlePortrait } from '../particle-portrait/index.js';
 
 const base = import.meta.env.BASE_URL;
@@ -12,7 +13,7 @@ export function usePortrait() {
 
 /**
  * One fixed, full-page particle layer behind every section. Sections are text layers on top;
- * the particles change shape through `portrait.state` (shift, morph, work) as the page scrolls.
+ * the particles change shape through `portrait.state` (shift, morph, map, dna, ...) as the page scrolls.
  */
 export default function ParticleBackground({ children }) {
   const stage = useRef(null);
@@ -24,6 +25,7 @@ export default function ParticleBackground({ children }) {
       map: `${base}portrait/portrait-map.png`,
       meta: `${base}portrait/portrait-map.json`,
       count: params.has('count') ? Number(params.get('count')) : null,
+      outline: countryOutline,
     });
     setPortrait(instance);
     if (import.meta.env.DEV || params.has('debug')) {

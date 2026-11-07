@@ -89,11 +89,14 @@ export default function ParticleHero() {
       );
     });
 
-    // Orbiting text: fades/unblurs in as the globe completes, then turns slowly (time + scroll).
+    // Orbiting text: fades/unblurs in as the globe completes, turns slowly (time + scroll), and
+    // fades out again as the globe is sliced into the map.
+    const smooth = (x) => {
+      const t = Math.min(1, Math.max(0, x));
+      return t * t * (3 - 2 * t);
+    };
     const tick = (_, deltaMs) => {
-      const m = portrait.state.morph;
-      const t = Math.min(1, Math.max(0, (m - 0.84) / 0.16));
-      const v = t * t * (3 - 2 * t);
+      const v = smooth((portrait.state.morph - 0.84) / 0.16) * (1 - smooth(portrait.state.map / 0.14));
       if (v <= 0) {
         ringState.drift = 0;
         if (ringValue === 0) return;

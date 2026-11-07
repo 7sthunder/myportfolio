@@ -2,14 +2,19 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import { Background, Dust } from './Atmosphere.js';
 import { InteractionField } from './InteractionField.js';
+import { buildJourneyTargets } from './journey.js';
 import { computeLayout, DEFAULT_COMPOSITION } from './layout.js';
 import { PortraitParticles } from './PortraitParticles.js';
 import { createSampler, fetchPortraitMap } from './samplerClient.js';
 import { DEFAULT_SAMPLING, headTopLocal, particleBudget } from './sampling.js';
-import { clamp, damp, easeInOutCubic, lerp } from './utils.js';
+import { clamp, damp, easeInOutCubic, lerp, smoothstep } from './utils.js';
 
 /** Pixels per local unit of the hero bust in the reference (1900x956); particle sizes scale from it. */
 const REFERENCE_PX_PER_UNIT = 458;
+
+/** 0 -> 1 between a and b, back to 0 between c and d. */
+const bump = (x, a, b, c, d) => smoothstep(a, b, x) * (1 - smoothstep(c, d, x));
+const mix3 = (out, a, b, t) => out.set(lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t));
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -37,6 +42,8 @@ export const DEFAULT_OPTIONS = {
   composition: DEFAULT_COMPOSITION,
   reducedMotion: null, // null = follow prefers-reduced-motion
   pointerTarget: null, // element receiving pointer events (default: window)
+  outline: null, // { width, height, path } country silhouette for the "Based in" map (journey.js)
+  mapHeight: 0.86, // map height as a fraction of the viewport height
   onLayout: null, // (layout) => void, called after every resize (sync DOM overlays)
   onReady: null,
 };
@@ -49,6 +56,12 @@ export const DEFAULT_OPTIONS = {
  *   portrait.intro();                 // formation timeline (GSAP)
  *   portrait.state.shift = 0..1;      // hero -> about (scroll driven)
  *   portrait.state.morph = 0..1;      // portrait -> globe (scroll driven)
+ *   portrait.state.map = 0..1;        // globe -> country map
+ *   portrait.state.dna = 0..1;        // map -> twisted ribbon
+ *   portrait.state.flow = radians;    // ribbon phase (scroll driven, added to time)
+ *   portrait.state.coil = 0..1;       // ribbon -> coil
+ *   portrait.state.tunnel = 0..1;     // coil turns to face the camera (tunnel)
+ *   portrait.state.frame = 0..1;      // tunnel -> frame around portrait.frameElement
  *   portrait.dispose();
  *
  * Nothing here touches framework state: scroll/pointer inputs are plain fields read by the
@@ -61,7 +74,9 @@ export class ParticlePortrait {
     this.options.composition = { ...DEFAULT_COMPOSITION, ...(options.composition ?? {}) };
     this.reducedMotion = this.options.reducedMotion ?? prefersReducedMotion();
 
-    this.state = { shift: 0, morph: 0, work: 0 };
+    this.state = { shift: 0, morph: 0, map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, frame: 0 };
+    this.frameElement = null;
+    this.flowTime = 0;
     this.anim = { intro: 0, formation: 0, blur: 0, aperture: this.options.introAperture };
     this.time = 0;
     this.swirl = 0;
@@ -178,6 +193,11 @@ export class ParticlePortrait {
       );
     this.data = await sampler.sample(Math.round(count));
     sampler.dispose();
+    if (this.disposed) return this;
+    if (options.outline) {
+      this.outlineAspect = options.outline.width / options.outline.height;
+      this.data.journey = buildJourneyTargets(this.data, options.outline);
+    }
     this.samplingTime = performance.now() - t0;
     if (this.disposed) return this;
 
@@ -432,9 +452,8 @@ export class ParticlePortrait {
     u.uBlur.value = this.anim.blur;
     u.uAperture.value = this.anim.aperture;
     u.uMorph.value = morph;
-    u.uWork.value = clamp(this.state.work);
-    u.uHelixTime.value = this.time * 0.6 + this.state.work * 2.4;
     u.uSwirl.value = this.swirl;
+    this.updateJourney(dt);
     u.uSpherePhase.value = this.spherePhase;
     u.uPointer.value.copy(this.light);
     u.uField.value = this.field.texture;
@@ -444,6 +463,83 @@ export class ParticlePortrait {
     const gx = 0.5 + this.group.position.x / (2 * L.halfWidth);
     const gy = 0.5 + (this.group.position.y + 0.15 * this.group.scale.x) / (2 * L.halfHeight);
     glow.set(gx, clamp(gy, 0.3, 0.7));
+  }
+
+  /**
+   * Shapes after the globe, all in world units relative to the viewport (z = 0 plane):
+   * country map -> diagonal twisted ribbon -> coil -> tunnel (axis turned towards the camera)
+   * -> rectangular frame around `frameElement` (the contact card).
+   */
+  updateJourney(dt) {
+    const L = this.layout;
+    const u = this.particles.uniforms;
+    const s = this.state;
+    const map = clamp(s.map);
+    const dna = clamp(s.dna);
+    const coil = easeInOutCubic(clamp(s.coil));
+    const tunnel = easeInOutCubic(clamp(s.tunnel));
+    const frame = clamp(s.frame);
+
+    u.uMap.value = map;
+    u.uDna.value = dna;
+    u.uFrame.value = frame;
+    u.uCoil.value = coil;
+
+    const mapAspect = this.outlineAspect ?? 0.88;
+    const mapPx = Math.min(this.options.mapHeight * this.size.height, (0.9 * this.size.width) / mapAspect);
+    u.uMapScale.value = (mapPx * L.wpp) / L.globe.s;
+
+    // The map defocuses as it dissolves; the ribbon sharpens as it condenses.
+    u.uBlur.value = this.anim.blur + 5 * bump(dna, 0.04, 0.3, 0.45, 0.9) + 2.5 * bump(frame, 0.0, 0.35, 0.5, 0.95);
+
+    if (dna <= 0) return;
+    if (!this.reducedMotion) this.flowTime += dt * (0.22 + 0.25 * tunnel);
+    u.uFlow.value = this.flowTime + s.flow;
+
+    const hw = L.halfWidth;
+    const hh = L.halfHeight;
+    const k = Math.min(hh, hw * 1.15);
+    // Ribbon: rises from the lower left to the upper right, its right end closer to the camera.
+    const ribbon = { a: [-hw * 1.3, -hh * 0.62, -0.8], b: [hw * 1.3, hh * 1.05, 1.2] };
+    // Coil: flatter and deeper, so the loops read as arcs with cusps.
+    const coiled = { a: [-hw * 1.25, -hh * 0.02, -2.4], b: [hw * 1.2, hh * 0.32, 1.4] };
+    const a = this._a ?? (this._a = new THREE.Vector3());
+    const b = this._b ?? (this._b = new THREE.Vector3());
+    const t2 = this._t ?? (this._t = new THREE.Vector3());
+    mix3(a, ribbon.a, coiled.a, coil);
+    mix3(b, ribbon.b, coiled.b, coil);
+
+    // Tunnel: the coil's axis swings round to point away from the camera, through the centre.
+    const dir = t2.subVectors(b, a);
+    let length = dir.length();
+    dir.normalize();
+    const tunnelDir = [0.07, 0.03, -1];
+    const origin = u.uAxisOrigin.value;
+    mix3(origin, a.toArray(), [0, 0, 2.4], tunnel);
+    const axis = u.uAxisDir.value;
+    mix3(axis, dir.toArray(), tunnelDir, tunnel).normalize();
+    length = lerp(length, 36, tunnel);
+
+    const up = Math.abs(axis.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    u.uAxisN1.value.crossVectors(axis, up).normalize();
+    u.uAxisN2.value.crossVectors(u.uAxisN1.value, axis).normalize();
+    u.uAxisLength.value = length;
+    u.uTwist.value = lerp(1.45, 3, coil);
+    u.uLoops.value = lerp(lerp(0, 5.5, coil), 10, tunnel);
+    u.uCoilRadius.value = lerp(k * 0.32 * coil, k * 0.6, tunnel);
+    u.uRibbonWidth.value = lerp(lerp(k * 0.3, k * 0.17, coil), k * 0.14, tunnel);
+
+    if (frame > 0 && this.frameElement) {
+      const r = this.frameElement.getBoundingClientRect();
+      const c = this.renderer.domElement.getBoundingClientRect();
+      const band = clamp(r.height * 0.13, 16, 64);
+      u.uFrameCenter.value.set(
+        (r.left + r.width / 2 - c.left - c.width / 2) * L.wpp,
+        (c.top + c.height / 2 - r.top - r.height / 2) * L.wpp,
+      );
+      u.uFrameHalf.value.set(((r.width - band) / 2) * L.wpp, ((r.height - band) / 2) * L.wpp);
+      u.uFrameBand.value = band * L.wpp;
+    }
   }
 
   /** Adaptive quality: lower pixel ratio first, then particle density, if frames are slow. */

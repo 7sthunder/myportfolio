@@ -18,6 +18,9 @@ export class PortraitParticles {
     geometry.setAttribute('aScatter', new THREE.BufferAttribute(data.scatter, 3));
     geometry.setAttribute('aRandom', new THREE.BufferAttribute(data.random, 4));
     geometry.setAttribute('aShade', new THREE.BufferAttribute(data.shade, 4));
+    const journey = data.journey ?? { map: new Float32Array(data.count * 4), journey: new Float32Array(data.count * 4) };
+    geometry.setAttribute('aMap', new THREE.BufferAttribute(journey.map, 4));
+    geometry.setAttribute('aJourney', new THREE.BufferAttribute(journey.journey, 4));
     geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
 
     this.count = data.count;
@@ -40,12 +43,26 @@ export class PortraitParticles {
       uScatterOffset: { value: new THREE.Vector3() },
 
       uMorph: { value: 0 },
-      uWork: { value: 0 },
-      uHelixTime: { value: 0 },
-      uHelixRadius: { value: 0.24 },
-      uHelixLength: { value: 9.0 },
-      uHelixLift: { value: 0.35 },
       uSwirl: { value: 0 },
+      uSphereRadius: { value: data.sphereRadius ?? 0.86 },
+      uMap: { value: 0 },
+      uMapScale: { value: 1 },
+      uDna: { value: 0 },
+      uAxisOrigin: { value: new THREE.Vector3() },
+      uAxisDir: { value: new THREE.Vector3(1, 0, 0) },
+      uAxisN1: { value: new THREE.Vector3(0, 1, 0) },
+      uAxisN2: { value: new THREE.Vector3(0, 0, 1) },
+      uAxisLength: { value: 10 },
+      uRibbonWidth: { value: 0.6 },
+      uTwist: { value: 1.5 },
+      uFlow: { value: 0 },
+      uCoil: { value: 0 },
+      uCoilRadius: { value: 0 },
+      uLoops: { value: 6 },
+      uFrame: { value: 0 },
+      uFrameCenter: { value: new THREE.Vector2() },
+      uFrameHalf: { value: new THREE.Vector2(3, 1) },
+      uFrameBand: { value: 0.25 },
       uSpherePhase: { value: 0 },
       uBands: { value: new THREE.Vector3(data.bands.count, data.bands.top, data.bands.height) },
       uBandSphere: { value: Float32Array.from({ length: 8 }, (_, i) => data.bands.sphereCenters[i] ?? 0) },

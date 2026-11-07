@@ -204,112 +204,155 @@ html.pp-has-cursor * {
   background: radial-gradient(60% 70% at 50% 60%, #34323c 0%, var(--pp-bg) 70%);
 }
 
-/* ---------------------------------------------------------------- featured works */
 
-.pp-works {
+/* ---------------------------------------------------------------- journey (after the globe) */
+
+.pp-journey {
   position: relative;
-  z-index: 1;
-  height: 220vh; /* replaced at runtime by the scroll distance from getLayout() */
-}
-
-.pp-works__kicker {
-  position: fixed;
-  top: 5.92593vh;
-  left: 0;
   z-index: 2;
 }
 
-.pp-works__kicker-label {
-  position: absolute;
+/* Text and works layers stay on screen while the particles change shape behind them. */
+.pp-journey__stage {
+  position: sticky;
   top: 0;
-  left: 4.16667vw;
+  z-index: 1;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pp-journey__content {
+  position: relative;
+  margin-top: -100vh;
+  margin-top: -100svh;
+  pointer-events: none;
+}
+
+.pp-based {
+  position: absolute;
+  top: 50vh;
+  left: 51.5%;
+  margin: 0;
+  font-size: var(--pp-text);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+  white-space: nowrap;
+}
+
+/* Blur-in / blur-out reveal shared by the overlay texts. */
+.pp-statement,
+.pp-works__kicker,
+.pp-closing,
+.pp-contact__email,
+.pp-contact .pp-char,
+.pp-footer {
+  opacity: 0;
+  filter: blur(10px);
+  transition:
+    opacity 0.6s ease,
+    filter 0.6s ease;
+}
+
+.pp-statement[data-active='true'],
+.pp-works__kicker[data-active='true'],
+.pp-closing[data-active='true'],
+.pp-contact[data-active='true'] .pp-contact__email,
+.pp-contact[data-active='true'] .pp-char,
+.pp-contact[data-active='true'] .pp-footer {
+  opacity: 1;
+  filter: blur(0);
+}
+
+.pp-statement {
+  position: absolute;
+  top: 50%;
+  right: var(--pp-gutter);
+  width: min(41.5vw, 980px);
+  margin: 0;
+  transform: translateY(-50%);
+  font-size: var(--pp-text);
+  font-weight: 400;
+  line-height: 1.24;
+  letter-spacing: -0.022em;
+  text-align: right;
+  text-wrap: balance;
+}
+
+.pp-closing {
+  position: absolute;
+  top: 50%;
+  left: var(--pp-gutter);
+  max-width: 34vw;
+  margin: 0;
+  transform: translateY(-50%);
+  font-size: var(--pp-text);
+  line-height: 1.24;
+  letter-spacing: -0.022em;
+}
+
+/* ---------------------------------------------------------------- works */
+
+.pp-works__kicker {
+  position: absolute;
+  top: 5.4vh;
+  left: 4.2vw;
+  z-index: 2;
   margin: 0;
   color: var(--pp-muted);
-  font-size: 0.833333vw;
-  line-height: 1.14583vw;
+  font-size: clamp(11px, 0.85vw, 18px);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  filter: blur(10px);
-  transition: opacity 0.4s, filter 0.4s;
 }
 
-.pp-works__kicker-label[data-active='true'] {
-  opacity: 1;
-  filter: blur(0);
-}
-
-.pp-works__closing-wrap {
-  position: fixed;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 90vw;
-  margin: 0 auto;
-  pointer-events: none;
-}
-
-.pp-works__closing {
-  max-width: 33.3333vw;
-  margin: 0;
-  color: var(--pp-fg);
-  font-size: 1.5625vw;
-  line-height: 1.82292vw;
-  text-align: left;
-  text-wrap: balance;
-  opacity: 0;
-  filter: blur(10px);
-  transition: opacity 0.4s, filter 0.4s;
-}
-
-.pp-works__closing[data-active='true'] {
-  opacity: 1;
-  filter: blur(0);
-}
-
-.pp-works__stage {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  height: 100svh;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.pp-works__stage[data-active='true'] {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.pp-works__marquee {
+.pp-works {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  margin-top: 4.62963vh;
-  overflow: hidden;
-  pointer-events: none;
+  visibility: hidden;
+}
+
+.pp-works[data-active='true'] {
+  visibility: visible;
+}
+
+.pp-works__gl {
+  position: absolute;
+  inset: 0;
+}
+
+.pp-works__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .pp-works__track {
+  position: absolute;
+  top: 48.5%;
+  left: 0;
   display: flex;
-  align-items: center;
+  flex-direction: row-reverse; /* the track travels left to right: the first work leads */
+  align-items: flex-start;
   gap: 12vw;
   width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transform: translate3d(-100vw, 0, 0);
   will-change: transform;
 }
 
 .pp-works__tile {
   flex: none;
-  display: block;
-  width: 50vw;
+  width: 47.5vw;
+  /* Centre the sheet (not the caption) on the track line. */
+  margin-top: calc(-47.5vw / 1.64 / 2);
+}
+
+.pp-works[data-active='true'] .pp-works__tile {
   pointer-events: auto;
 }
 
@@ -320,17 +363,31 @@ html.pp-has-cursor * {
 }
 
 .pp-works__media {
+  position: relative;
   display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
+  aspect-ratio: 1.64;
+  overflow: hidden;
   border-radius: 6px;
-  box-shadow: inset 0 0 0 1px rgba(238, 238, 242, 0.08);
-  transition: filter 0.4s;
+  background: var(--tone, #3a3846);
 }
 
-.pp-works__link:hover .pp-works__media {
-  filter: drop-shadow(0 1.48148vh 2.59259vh rgba(255, 255, 255, 0.22));
+.pp-works__media img {
+  position: absolute;
+  inset: 7%;
+  width: 86%;
+  height: 86%;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 8px;
+}
+
+/* With WebGL the sheets are drawn (and waved) on the canvas; the DOM keeps links and alt text. */
+.pp-journey--gl .pp-works__media {
+  background: transparent;
+}
+
+.pp-journey--gl .pp-works__media img {
+  opacity: 0;
 }
 
 .pp-works__caption {
@@ -338,55 +395,195 @@ html.pp-has-cursor * {
   align-items: baseline;
   justify-content: space-between;
   gap: 1.25vw;
-  margin-top: 2.77778vh;
+  margin-top: 3.4vh;
 }
 
 .pp-works__title {
-  margin: 0;
   color: var(--pp-fg);
-  font-size: 1.5625vw;
-  line-height: 1.82292vw;
+  font-size: clamp(15px, 1.56vw, 32px);
+  letter-spacing: -0.02em;
   text-decoration: none;
-}
-
-.pp-works__meta {
-  display: flex;
-  align-items: baseline;
-  gap: 0.833333vw;
 }
 
 .pp-works__info {
   color: var(--pp-muted);
-  font-size: 1.04167vw;
-  line-height: 1.30208vw;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: clamp(12px, 1.1vw, 22px);
   white-space: nowrap;
 }
 
-@media (orientation: portrait) {
+/* ---------------------------------------------------------------- contact */
+
+.pp-contact {
+  position: absolute;
+  inset: 0;
+}
+
+.pp-contact__card {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 56vw;
+  height: max(20vw, 15em);
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.pp-contact__kicker {
+  margin: 0 0 1.4vw;
+  color: var(--pp-muted);
+  font-size: clamp(11px, 0.85vw, 18px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pp-contact__email {
+  color: var(--pp-fg);
+  font-size: clamp(26px, 4.25vw, 96px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pp-contact__alt {
+  margin: 1.6vw 0 0;
+  color: var(--pp-muted);
+  font-size: clamp(13px, 1.06vw, 22px);
+  letter-spacing: -0.01em;
+}
+
+.pp-contact__alt a {
+  color: var(--pp-fg);
+  text-decoration: none;
+}
+
+.pp-contact .pp-char {
+  transition-delay: var(--d, 0ms);
+}
+
+.pp-contact[data-active='true'] a {
+  pointer-events: auto;
+}
+
+.pp-contact__email:hover,
+.pp-contact__alt a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.pp-footer {
+  position: absolute;
+  right: var(--pp-gutter);
+  bottom: 7.5vh;
+  left: var(--pp-gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2em;
+  color: var(--pp-muted);
+  font-size: clamp(10px, 0.85vw, 17px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition-delay: 0.25s;
+}
+
+.pp-footer p {
+  display: flex;
+  align-items: center;
+  gap: 0.9em;
+  margin: 0;
+}
+
+.pp-footer__mark {
+  width: 2.2em;
+  height: 2.2em;
+  opacity: 0.7;
+}
+
+/* ---------------------------------------------------------------- journey: portrait / mobile */
+
+@media (max-aspect-ratio: 85/100) {
+  .pp-based {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .pp-statement {
+    top: auto;
+    right: var(--pp-gutter);
+    bottom: 12vh;
+    left: var(--pp-gutter);
+    width: auto;
+    transform: none;
+    font-size: clamp(17px, 4.8vw, 26px);
+  }
+
+  .pp-closing {
+    top: 16vh;
+    right: var(--pp-gutter);
+    max-width: none;
+    transform: none;
+    font-size: clamp(17px, 4.8vw, 26px);
+  }
+
+  .pp-works__kicker {
+    top: 4vh;
+    left: var(--pp-gutter);
+    font-size: clamp(11px, 3vw, 14px);
+  }
+
+  .pp-works__track {
+    top: 45%;
+  }
+
   .pp-works__tile {
-    width: 85vw;
+    width: 84vw;
+    margin-top: calc(-84vw / 1.64 / 2);
   }
 
-  .pp-works__kicker-label {
-    font-size: 1.62963vh;
-    line-height: 2.24074vh;
-  }
-
-  .pp-works__closing {
-    max-width: 100%;
-    font-size: 3.05556vh;
-    line-height: 3.56481vh;
+  .pp-works__caption {
+    margin-top: 2vh;
   }
 
   .pp-works__title {
-    font-size: 3.05556vh;
-    line-height: 3.56481vh;
+    font-size: clamp(16px, 4.6vw, 24px);
   }
 
   .pp-works__info {
-    font-size: 2.03704vh;
-    line-height: 2.5463vh;
+    font-size: clamp(12px, 3.4vw, 16px);
+  }
+
+  .pp-contact__card {
+    top: 44%;
+    width: 86vw;
+    height: 56vw;
+  }
+
+  .pp-contact__kicker {
+    margin-bottom: 3.5vw;
+    font-size: 3vw;
+  }
+
+  .pp-contact__email {
+    font-size: clamp(18px, 6.6vw, 40px);
+  }
+
+  .pp-contact__alt {
+    margin-top: 3.5vw;
+    font-size: clamp(13px, 3.6vw, 18px);
+  }
+
+  .pp-footer {
+    bottom: 5vh;
+    flex-direction: column;
+    gap: 0.8em;
+    font-size: clamp(9px, 2.6vw, 12px);
+    text-align: center;
   }
 }
