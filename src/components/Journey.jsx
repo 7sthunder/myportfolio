@@ -5,33 +5,38 @@ import { achievements, experience } from '../data/milestones.js';
 import { site } from '../data/site.js';
 import { works } from '../data/works.js';
 import { splitText } from '../experience/text.js';
-import { rasteriseSection } from '../experience/glyphTargets.js';
-import { WorksCanvas } from '../experience/WorksCanvas.js';
+import { emphasiseEdges, rasteriseSection } from '../experience/glyphTargets.js';
 import { CalendarIcon, MilestoneIcon, SilverDefs } from './MilestoneIcons.jsx';
 import { usePortrait } from './ParticleBackground.jsx';
+import WorkArt from './WorkArt.jsx';
 
 gsap.registerPlugin(ScrollTrigger);
-
-const base = import.meta.env.BASE_URL;
 
 /**
  * Scroll choreography after the globe, in viewport heights of scroll (1 = 100vh), measured from
  * the moment this section's top enters the bottom of the viewport (the globe is complete then):
  *
  *   globe -> map of India ("Based in India" scrolls past) -> map dissolves into a twisted ribbon
- *   (statement) -> works slide across over the ribbon -> ribbon winds into a coil, then a tunnel
+ *   (statement) -> the ribbon's particles draw the works one at a time (illustration + text),
+ *   flying from one project straight into the next -> ribbon winds into a coil, then a tunnel
  *   ("And still working on plenty more.") -> the tunnel unravels into the experience timeline
  *   (glowing line + orbs) -> corner currents behind the achievements -> the frame of the
  *   contact card.
  */
-const WORKS_SPAN = works.length * 1.05 + 0.7;
+const WORK_MOVE = 0.85; // scroll for one transition (ribbon -> project, project -> project, ...)
+const WORK_HOLD = 0.45; // scroll a formed project stays put
+const WORKS_SPAN = (works.length + 1) * WORK_MOVE + works.length * WORK_HOLD;
+// Landing front of the works transitions (must match works() in the particle shader): a particle
+// whose target sits at screen fraction x has landed once the transition is >= 0.5 x + 0.46.
+const WORK_LAND = { slope: 0.5, start: 0.46 };
+const SPELL_LAND = { slope: 0.55, start: 0.45 };
 const T = (() => {
   const t = { mapIn: 0.02, mapDone: 1.05, dnaIn: 1.6, dnaDone: 2.9, statementIn: 2.55, statementOut: 3.45 };
   t.worksIn = 3.4;
   t.worksOut = t.worksIn + WORKS_SPAN;
-  t.kickerIn = t.worksIn + 0.15;
-  t.kickerOut = t.worksOut - 0.4;
-  t.coilIn = t.worksOut - 1.15;
+  t.kickerIn = t.worksIn + 0.3;
+  t.kickerOut = t.worksOut - 0.75;
+  t.coilIn = t.worksOut - 0.95;
   t.coilDone = t.worksOut + 0.2;
   t.closingIn = t.worksOut - 0.45;
   t.tunnelIn = t.worksOut + 0.05;
@@ -58,21 +63,35 @@ const T = (() => {
   return t;
 })();
 
-function WorkTile({ work, mediaRef }) {
-  const Link = work.live ? 'a' : 'span';
-  const linkProps = work.live ? { href: work.live, target: '_blank', rel: 'noreferrer' } : {};
+const pad = (n) => String(n).padStart(2, '0');
+
+function WorkPanel({ work, index, panelRef }) {
   return (
-    <li className="pp-works__tile">
-      <Link className="pp-works__link" {...linkProps}>
-        <span className="pp-works__media" ref={mediaRef} style={{ '--tone': work.tone }}>
-          <img src={`${base}works/${work.shot}`} alt={work.shotAlt} loading="lazy" draggable="false" />
-        </span>
-      </Link>
-      <div className="pp-works__caption">
-        <Link className="pp-works__title" {...linkProps}>
-          {work.title}
-        </Link>
-        <span className="pp-works__info">{work.info}</span>
+    <li className="pp-work" ref={panelRef} data-active="false">
+      <div className="pp-work__text">
+        <p className="pp-work__kicker pp-reveal">
+          {pad(index + 1)} <span aria-hidden="true">-</span> {work.info}
+        </p>
+        <h3 className="pp-work__title pp-reveal">{work.title}</h3>
+        <p className="pp-work__summary pp-reveal">{work.summary}</p>
+        <ul className="pp-work__tags pp-reveal" aria-label="Built with">
+          {work.tags.map((tag) => (
+            <li className="pp-work__tag" key={tag}>
+              {tag}
+            </li>
+          ))}
+        </ul>
+        {work.live && (
+          <a className="pp-work__link pp-reveal" href={work.live} target="_blank" rel="noreferrer">
+            Visit live site
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        )}
+      </div>
+      <div className="pp-work__art pp-reveal">
+        <WorkArt name={work.art} />
       </div>
     </li>
   );
@@ -93,8 +112,7 @@ export default function Journey() {
   const statement = useRef(null);
   const kicker = useRef(null);
   const stage = useRef(null);
-  const track = useRef(null);
-  const glLayer = useRef(null);
+  const panels = useRef([]);
   const closing = useRef(null);
   const contact = useRef(null);
   const card = useRef(null);
@@ -102,7 +120,6 @@ export default function Journey() {
   const expLine = useRef(null);
   const expNodes = useRef([]);
   const ach = useRef(null);
-  const media = useRef([]);
 
   useEffect(() => {
     if (!portrait) return;
@@ -112,31 +129,26 @@ export default function Journey() {
     portrait.frameElement = card.current;
     portrait.timelineAnchors = { line: expLine.current, nodes: expNodes.current };
 
-    let gl = null;
-    try {
-      gl = new WorksCanvas(
-        glLayer.current,
-        works.map((work, i) => ({ el: media.current[i], src: `${base}works/${work.shot}`, tone: work.tone })),
-      );
-      root.current.classList.add('pp-journey--gl');
-    } catch {
-      gl = null;
-    }
-
-    const works$ = { progress: 0 };
     let alive = true;
     let building = false;
+    let buildingWorks = false;
     let fontsReady = false;
     document.fonts.ready.then(() => (fontsReady = true));
-    const onResize = () => (portrait.spellDirty = true);
+    const onResize = () => {
+      portrait.spellDirty = true;
+      portrait.workDirty = true;
+    };
 
-    // Landing front of the particle sweep (must match spell() in the particle shader): a particle
-    // whose target sits at screen fraction x has fully landed once amount >= 0.55 x + 0.45.
-    const expParts = [...exp.current.querySelectorAll('.pp-reveal')].map((el) => ({ el, css: '' }));
-    const achParts = [...ach.current.querySelectorAll('.pp-reveal')].map((el) => ({ el, css: '' }));
-    const condense = (parts, amount) => {
+    const partsOf = (el) => [...el.querySelectorAll('.pp-reveal')].map((part) => ({ el: part, css: '' }));
+    const expParts = partsOf(exp.current);
+    const achParts = partsOf(ach.current);
+    const workParts = panels.current.map(partsOf);
+
+    // Reveals content exactly where the particles have landed: a mask follows the landing front
+    // of the particle sweep (land.start + land.slope * x, see the particle shader).
+    const condense = (parts, amount, land = SPELL_LAND) => {
       const w = window.innerWidth;
-      const front = ((amount - 0.45) / 0.55) * w;
+      const front = ((amount - land.start) / land.slope) * w;
       const feather = 0.12 * w;
       for (const part of parts) {
         const r = part.el.getBoundingClientRect();
@@ -154,6 +166,51 @@ export default function Journey() {
         style.webkitMaskImage = mask;
       }
     };
+    const fade = (parts, alpha) => {
+      const css = alpha <= 0 ? 'hidden' : alpha >= 1 ? 'solid' : `fade ${alpha.toFixed(3)}`;
+      for (const part of parts) {
+        if (css === part.css) continue;
+        part.css = css;
+        const { style } = part.el;
+        style.opacity = css === 'hidden' ? '0' : css === 'solid' ? '1' : alpha.toFixed(3);
+        style.maskImage = '';
+        style.webkitMaskImage = '';
+      }
+    };
+
+    // Works: the formed project (k0) dissolves back into its particles first, then the next one
+    // condenses where they land (see works() in the particle shader).
+    const showWorks = () => {
+      const k0 = Math.floor(state.work);
+      const f = state.work - k0;
+      workParts.forEach((parts, k) => {
+        if (k === k0) fade(parts, 1 - gsap.utils.clamp(0, 1, f / 0.12));
+        else if (k === k0 + 1) condense(parts, f, WORK_LAND);
+        else fade(parts, 0);
+        set(panels.current[k], (k === k0 && f < 0.1) || (k === k0 + 1 && f > 0.9));
+      });
+    };
+
+    // Rasterises every project (illustration and text separately) from the live layout.
+    const buildWorks = async () => {
+      const origin = stage.current;
+      const list = [];
+      for (const panel of panels.current) {
+        const [art, text] = await Promise.all([
+          rasteriseSection(panel.querySelector('.pp-work__svg'), { origin }),
+          rasteriseSection(panel, { origin, exclude: '.pp-work__art', outline: '.pp-work__tag, .pp-work__link' }),
+        ]);
+        const drawing = emphasiseEdges(art);
+        list.push({ width: drawing.width, height: drawing.height, art: drawing.points, text: text.points });
+      }
+      return list;
+    };
+
+    const set = (el, on) => {
+      const v = String(on);
+      if (el.dataset.active !== v) el.dataset.active = v;
+    };
+
     window.addEventListener('resize', onResize);
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -163,7 +220,6 @@ export default function Journey() {
       tl.to(state, { map: 1, duration: T.mapDone - T.mapIn }, T.mapIn)
         .to(state, { dna: 1, duration: T.dnaDone - T.dnaIn }, T.dnaIn)
         .to(state, { flow: 9, duration: T.frameIn - T.dnaIn }, T.dnaIn)
-        .to(works$, { progress: 1, duration: T.worksOut - T.worksIn }, T.worksIn)
         .to(state, { coil: 1, duration: T.coilDone - T.coilIn }, T.coilIn)
         .to(state, { tunnel: 1, duration: T.tunnelDone - T.tunnelIn }, T.tunnelIn)
         .to(state, { experience: 1, duration: T.expDone - T.expIn }, T.expIn)
@@ -174,13 +230,17 @@ export default function Journey() {
         .to(state, { achSpell: 0, duration: T.achOutDone - T.achOutIn }, T.achOutIn)
         .to(state, { frame: 1, duration: T.frameDone - T.frameIn }, T.frameIn)
         .to({}, { duration: 0.001 }, T.end - 0.001);
+      // Ribbon -> project 0 -> project 1 -> ... -> last project -> ribbon, one step per project.
+      for (let k = 0; k <= works.length; k++) {
+        tl.fromTo(
+          state,
+          { work: k - 1 },
+          { work: k, duration: WORK_MOVE, immediateRender: false },
+          T.worksIn + k * (WORK_MOVE + WORK_HOLD),
+        );
+      }
 
-      const set = (el, on) => {
-        const v = String(on);
-        if (el.dataset.active !== v) el.dataset.active = v;
-      };
-
-      const tick = (_, deltaMs) => {
+      const tick = () => {
         const t = tl.time();
         set(statement.current, t >= T.statementIn && t < T.statementOut);
         set(kicker.current, t >= T.kickerIn && t < T.kickerOut);
@@ -210,16 +270,17 @@ export default function Journey() {
         }
         set(contact.current, t >= T.contactIn);
 
-        const active = t > T.worksIn - 0.05 && t < T.worksOut + 0.05;
-        set(stage.current, active);
-        if (!active) {
-          if (gl?.lastX !== null) gl?.clear();
-          return;
+        // Works targets are built once the visitor heads past the globe (not during the intro).
+        if (!buildingWorks && portrait.workDirty && portrait.loaded && fontsReady && t > T.mapIn && t < T.worksOut) {
+          buildingWorks = true;
+          portrait.workDirty = false;
+          buildWorks()
+            .then((list) => alive && portrait.setWorkTargets(list))
+            .catch(() => {})
+            .finally(() => (buildingWorks = false));
         }
-        const width = track.current.scrollWidth;
-        const x = -width + works$.progress * (window.innerWidth + width);
-        track.current.style.transform = `translate3d(${x.toFixed(1)}px, 0, 0)`;
-        gl?.render(deltaMs / 1000, x);
+        set(stage.current, t > T.worksIn - 0.05 && t < T.worksOut + 0.05);
+        showWorks();
       };
       gsap.ticker.add(tick);
       return () => gsap.ticker.remove(tick);
@@ -229,19 +290,18 @@ export default function Journey() {
       alive = false;
       window.removeEventListener('resize', onResize);
       ctx.revert();
-      gl?.dispose();
-      root.current?.classList.remove('pp-journey--gl');
       if (portrait.frameElement === card.current) portrait.frameElement = null;
       portrait.timelineAnchors = null;
-      Object.assign(state, { map: 0, dna: 0, flow: 0, coil: 0, tunnel: 0, experience: 0, expSpell: 0, achievements: 0, achSpell: 0, frame: 0 });
+      Object.assign(state, { map: 0, dna: 0, flow: 0, work: -1, coil: 0, tunnel: 0, experience: 0, expSpell: 0, achievements: 0, achSpell: 0, frame: 0 });
     };
   }, [portrait]);
 
   return (
     <section className="pp-journey" ref={root} aria-label="About, works and contact">
       <div className="pp-journey__stage">
+        <SilverDefs />
         <p className="pp-statement" ref={statement} data-active="false">
-          I don’t just execute what’s handed to me - I bring my own creative instinct into the mix, pushing interactions,
+          I don’t just execute what’s handed to me. I bring my own creative instinct into the mix, pushing interactions,
           animation and visual ideas wherever they’d genuinely elevate the work.
         </p>
 
@@ -249,14 +309,11 @@ export default function Journey() {
           Some selected works
         </p>
 
-        <div className="pp-works" ref={stage} data-active="false">
-          <div className="pp-works__gl" ref={glLayer} />
-          <ul className="pp-works__track" ref={track} aria-label="Selected works">
-            {works.map((work, i) => (
-              <WorkTile key={work.title} work={work} mediaRef={(el) => (media.current[i] = el)} />
-            ))}
-          </ul>
-        </div>
+        <ol className="pp-works" ref={stage} data-active="false" aria-label="Selected works">
+          {works.map((work, i) => (
+            <WorkPanel key={work.title} work={work} index={i} panelRef={(el) => (panels.current[i] = el)} />
+          ))}
+        </ol>
 
         <p className="pp-closing" ref={closing} data-active="false">
           And still working on plenty more.
@@ -290,7 +347,6 @@ export default function Journey() {
         </section>
 
         <section className="pp-ach" ref={ach} data-active="false" aria-labelledby="pp-ach-title">
-          <SilverDefs />
           <div className="pp-ach__mark pp-reveal" aria-hidden="true">
             <span />
             <svg viewBox="0 0 24 24">
@@ -340,7 +396,7 @@ export default function Journey() {
           <footer className="pp-footer">
             <p className="pp-footer__left">
               <Monogram />
-              {site.name} - © {new Date().getFullYear()}
+              {site.name} © {new Date().getFullYear()}
             </p>
             <p className="pp-footer__right">This website doesn’t use cookies.</p>
           </footer>

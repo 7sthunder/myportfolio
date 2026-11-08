@@ -12,6 +12,46 @@ import { clamp, createRandom, damp, easeInOutCubic, lerp, smoothstep } from './u
 /** Pixels per local unit of the hero bust in the reference (1900x956); particle sizes scale from it. */
 const REFERENCE_PX_PER_UNIT = 458;
 
+/** Works formations: particles per ink pixel of the illustration / of the text. */
+const WORK_ART_DENSITY = 0.45;
+const WORK_TEXT_DENSITY = 0.6;
+const GOLDEN = 0.6180339887498949;
+
+/** Index along a Hilbert curve on an n x n grid (n = power of two): nearby points, nearby indices. */
+function hilbertIndex(n, x, y) {
+  let d = 0;
+  for (let s = n >> 1; s > 0; s >>= 1) {
+    const rx = x & s ? 1 : 0;
+    const ry = y & s ? 1 : 0;
+    d += s * s * ((3 * rx) ^ ry);
+    if (!ry) {
+      if (rx) {
+        x = n - 1 - x;
+        y = n - 1 - y;
+      }
+      [x, y] = [y, x];
+    }
+  }
+  return d;
+}
+
+/** Raster ink points (pixel indices) ordered along a Hilbert curve over the viewport. */
+function hilbertOrder(points, width, height) {
+  const N = 1024;
+  const SHIFT = 2 ** 22;
+  const keys = new Float64Array(points.length);
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const gx = Math.min(N - 1, (((p % width) * N) / width) | 0);
+    const gy = Math.min(N - 1, ((Math.floor(p / width) * N) / height) | 0);
+    keys[i] = hilbertIndex(N, gx, gy) * SHIFT + i;
+  }
+  keys.sort();
+  const out = new Uint32Array(points.length);
+  for (let i = 0; i < keys.length; i++) out[i] = points[keys[i] % SHIFT];
+  return out;
+}
+
 /** 0 -> 1 between a and b, back to 0 between c and d. */
 const bump = (x, a, b, c, d) => smoothstep(a, b, x) * (1 - smoothstep(c, d, x));
 const mix3 = (out, a, b, t) => out.set(lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t));
@@ -59,6 +99,7 @@ export const DEFAULT_OPTIONS = {
  *   portrait.state.map = 0..1;        // globe -> country map
  *   portrait.state.dna = 0..1;        // map -> twisted ribbon
  *   portrait.state.flow = radians;    // ribbon phase (scroll driven, added to time)
+ *   portrait.state.work = -1..N;      // ribbon -> project 0 -> ... -> project N-1 -> ribbon
  *   portrait.state.coil = 0..1;       // ribbon -> coil
  *   portrait.state.tunnel = 0..1;     // coil turns to face the camera (tunnel)
  *   portrait.state.experience = 0..1; // tunnel -> timeline around portrait.timelineAnchors
@@ -82,6 +123,7 @@ export class ParticlePortrait {
       map: 0,
       dna: 0,
       flow: 0,
+      work: -1, // works: -1 = ribbon, k = project k formed, fractions = transitions (setWorkTargets)
       coil: 0,
       tunnel: 0,
       experience: 0,
@@ -91,6 +133,7 @@ export class ParticlePortrait {
       frame: 0,
     };
     this.spellDirty = true; // formation targets need rebuilding (resize / density change)
+    this.workDirty = true; // same for the works formations
     this.frameElement = null;
     this.timelineAnchors = null; // { line: Element, nodes: [Element, Element] }
     this.flowTime = 0;
@@ -270,6 +313,56 @@ export class ParticlePortrait {
     const target = this.budgetFor(this.size.width, this.size.height) / this.particles.count;
     this.particles.setDensity(Math.min(1, target) * this.density);
     this.spellDirty = true;
+    this.workDirty = true;
+  }
+
+  /**
+   * Assigns the works formations: one { width, height, art, text } raster per project (ink pixel
+   * indices in CSS px of the viewport, see experience/glyphTargets.js), at most 6.
+   *
+   * Every project is drawn by the same particles (the illustration from the front of the random
+   * particle order, the text from the back), and each particle takes the same relative spot
+   * along a Hilbert curve in every drawing, so between two projects the particles fly to the
+   * matching part of the next drawing instead of crossing the screen at random.
+   */
+  setWorkTargets(projects) {
+    if (!this.particles || !this.layout) return;
+    const geo = this.particles.geometry;
+    const attrs = ['aWorkA', 'aWorkB', 'aWorkC'].map((name) => geo.getAttribute(name));
+    for (const attr of attrs) attr.array.fill(1e4);
+    const visible = Math.min(geo.drawRange.count, this.particles.count);
+    // Leave at least 40% of the scenery in place.
+    const limit = Math.floor(visible * 0.6);
+    const { wpp } = this.layout;
+    const { width: W, height: H } = this.size;
+    const list = projects.slice(0, 6);
+
+    list.forEach((raster, k) => {
+      const a = attrs[k >> 1].array;
+      const off = (k & 1) * 2;
+      const rand = createRandom(97 + k);
+      const art = hilbertOrder(raster.art, raster.width, raster.height);
+      const text = hilbertOrder(raster.text, raster.width, raster.height);
+      const want = art.length * WORK_ART_DENSITY + text.length * WORK_TEXT_DENSITY;
+      const scale = Math.min(1, limit / Math.max(want, 1));
+      const nArt = art.length ? Math.floor(art.length * WORK_ART_DENSITY * scale) : 0;
+      const nText = text.length ? Math.floor(text.length * WORK_TEXT_DENSITY * scale) : 0;
+      const place = (i, j, points, flag) => {
+        // Golden-ratio sequence: evenly spread for any count, and the same spot for particle j
+        // in every project.
+        const u = (0.5 + j * GOLDEN) % 1;
+        const p = points[(u * points.length) | 0];
+        const px = (p % raster.width) + rand();
+        const py = Math.floor(p / raster.width) + rand();
+        a[i * 4 + off] = (px - W / 2) * wpp + flag;
+        a[i * 4 + off + 1] = (H / 2 - py) * wpp;
+      };
+      for (let j = 0; j < nArt; j++) place(j, j, art, 1000);
+      for (let j = 0; j < nText; j++) place(visible - 1 - j, j, text, 0);
+    });
+
+    for (const attr of attrs) attr.needsUpdate = true;
+    this.particles.uniforms.uWorkCount.value = list.length;
   }
 
   /**
@@ -546,6 +639,8 @@ export class ParticlePortrait {
     u.uAchSpell.value = clamp(s.achSpell);
     u.uHalf.value.set(L.halfWidth, L.halfHeight);
     u.uDna.value = dna;
+    u.uWork.value = s.work;
+    u.uWorkDim.value = u.uWorkCount.value ? clamp(Math.min(s.work + 1, u.uWorkCount.value - s.work)) : 0;
     u.uFrame.value = frame;
     u.uCoil.value = coil;
 

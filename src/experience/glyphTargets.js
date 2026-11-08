@@ -6,12 +6,14 @@
  * Everything is measured from the live layout, so it matches any viewport and breakpoint.
  *
  * @param {HTMLElement} root   section to rasterise (may be invisible, but must be laid out)
- * @param {object} shapes      { outline: selector, rule: selector }
+ * @param {object} shapes      { outline: selector, rule: selector, exclude: selector (skipped
+ *                             subtrees), origin: element whose box is the mask (default: offsetParent) }
  * @returns {Promise<{ width, height, points: Uint32Array }>} points = pixel indices (y * width + x)
  */
-export async function rasteriseSection(root, { outline = '', rule = '' } = {}) {
+export async function rasteriseSection(root, { outline = '', rule = '', exclude = '', origin: originEl = null } = {}) {
   const stage = root.getBoundingClientRect();
-  const origin = root.offsetParent?.getBoundingClientRect() ?? stage;
+  const origin = (originEl ?? root.offsetParent)?.getBoundingClientRect() ?? stage;
+  const skip = (el) => Boolean(exclude && el.closest(exclude));
   const width = Math.max(1, Math.round(origin.width));
   const height = Math.max(1, Math.round(origin.height));
   const canvas = Object.assign(document.createElement('canvas'), { width, height });
@@ -26,7 +28,7 @@ export async function rasteriseSection(root, { outline = '', rule = '' } = {}) {
   const range = document.createRange();
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const el = node.parentElement;
-    if (!el || el.closest('svg') || !node.textContent.trim()) continue;
+    if (!el || el.closest('svg') || skip(el) || !node.textContent.trim()) continue;
     const cs = getComputedStyle(el);
     ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     ctx.letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing;
@@ -65,9 +67,10 @@ export async function rasteriseSection(root, { outline = '', rule = '' } = {}) {
 
   // --- inline SVG icons, drawn white (dark inner details stay dark, so they read as holes)
   const serializer = new XMLSerializer();
-  const icons = [...root.querySelectorAll('svg')].map(async (svg) => {
+  const svgs = root.matches('svg') ? [root] : [...root.querySelectorAll('svg')];
+  const icons = svgs.map(async (svg) => {
     const r = svg.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) return;
+    if (r.width < 2 || r.height < 2 || skip(svg)) return;
     const clone = svg.cloneNode(true);
     clone.setAttribute('width', r.width);
     clone.setAttribute('height', r.height);
@@ -95,4 +98,24 @@ export async function rasteriseSection(root, { outline = '', rule = '' } = {}) {
     if (data[i + 3] > 110 && data[i] > 110) ink.push(p);
   }
   return { width, height, points: Uint32Array.from(ink) };
+}
+
+/**
+ * Repeats the ink pixels on the outlines of a mask (`times` extra copies), so particles sampled
+ * from it trace crisp contours instead of an even, blobby fill.
+ */
+export function emphasiseEdges({ width, height, points }, { radius = 2, times = 3 } = {}) {
+  const ink = new Uint8Array(width * height);
+  for (const p of points) ink[p] = 1;
+  const isInk = (x, y) => x >= 0 && y >= 0 && x < width && y < height && ink[y * width + x] === 1;
+  const edges = [];
+  for (const p of points) {
+    const x = p % width;
+    const y = (p - x) / width;
+    if (!isInk(x - radius, y) || !isInk(x + radius, y) || !isInk(x, y - radius) || !isInk(x, y + radius)) edges.push(p);
+  }
+  const out = new Uint32Array(points.length + edges.length * times);
+  out.set(points);
+  for (let k = 0; k < times; k++) out.set(edges, points.length + k * edges.length);
+  return { width, height, points: out };
 }

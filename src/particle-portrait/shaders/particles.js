@@ -94,6 +94,9 @@ export const particleVertex = /* glsl */ `
   uniform vec4 uNodes;       // timeline orbs: xy, zw (world)
   uniform float uNodeR;
   uniform float uAch;        // experience -> achievements streak bands + orbit
+  uniform float uWork;       // works: -1 = scenery, k = project k formed, fractions = transitions
+  uniform float uWorkCount;  // number of projects (scenery again at uWork = uWorkCount)
+  uniform float uWorkDim;    // dims the scenery behind the project formations
   uniform float uExpSpell;   // particles assemble into the experience text / elements
   uniform float uAchSpell;   // ... and into the achievements text / cards / icons
   uniform float uFrame;      // coil / tunnel -> contact frame
@@ -108,6 +111,9 @@ export const particleVertex = /* glsl */ `
   attribute vec4 aMap;     // xyz = country target (normalised), w = coastline
   attribute vec4 aJourney; // x = along, y = across, zw = gaussian jitter
   attribute vec4 aSpell;   // text formation targets: xy = experience, zw = achievements (1e4 = none)
+  attribute vec4 aWorkA;   // works formation targets, two projects each (see PortraitParticles)
+  attribute vec4 aWorkB;
+  attribute vec4 aWorkC;
 
   varying float vAlpha;
   varying float vSoft;
@@ -182,17 +188,34 @@ export const particleVertex = /* glsl */ `
 
   // Point on the contact frame (rounded band around a rectangle), ordered by angle around the
   // frame centre so the tunnel collapses onto it radially. xy = point, zw = outward normal.
+  // Rounded rectangle: straight sides, quarter-circle corners of radius r, so the band turns
+  // smoothly at every corner instead of bunching up at a sharp one.
   vec4 rectPoint(float q, vec2 h) {
-    float d = q * 4.0 * (h.x + h.y);
-    if (d < h.y) return vec4(h.x, d, 1.0, 0.0);
-    d -= h.y;
-    if (d < 2.0 * h.x) return vec4(h.x - d, h.y, 0.0, 1.0);
-    d -= 2.0 * h.x;
-    if (d < 2.0 * h.y) return vec4(-h.x, h.y - d, -1.0, 0.0);
-    d -= 2.0 * h.y;
-    if (d < 2.0 * h.x) return vec4(-h.x + d, -h.y, 0.0, -1.0);
-    d -= 2.0 * h.x;
-    return vec4(h.x, -h.y + d, 1.0, 0.0);
+    float r = min(min(h.x, h.y) * 0.5, 2.5 * uFrameBand);
+    vec2 c = h - vec2(r);
+    float sx = 2.0 * c.x;
+    float sy = 2.0 * c.y;
+    float arc = 0.5 * PI * r;
+    float total = 2.0 * (sx + sy) + 4.0 * arc;
+    float d = q * total;
+    // Right side (going up), top-right corner, top, top-left corner, left, bottom-left, bottom,
+    // bottom-right corner.
+    if (d < sy) return vec4(h.x, -c.y + d, 1.0, 0.0);
+    d -= sy;
+    if (d < arc) { float a = d / r; return vec4(c + r * vec2(cos(a), sin(a)), cos(a), sin(a)); }
+    d -= arc;
+    if (d < sx) return vec4(c.x - d, h.y, 0.0, 1.0);
+    d -= sx;
+    if (d < arc) { float a = PI * 0.5 + d / r; return vec4(vec2(-c.x, c.y) + r * vec2(cos(a), sin(a)), cos(a), sin(a)); }
+    d -= arc;
+    if (d < sy) return vec4(-h.x, c.y - d, -1.0, 0.0);
+    d -= sy;
+    if (d < arc) { float a = PI + d / r; return vec4(-c + r * vec2(cos(a), sin(a)), cos(a), sin(a)); }
+    d -= arc;
+    if (d < sx) return vec4(-c.x + d, -h.y, 0.0, -1.0);
+    d -= sx;
+    float a = 1.5 * PI + d / r;
+    return vec4(vec2(c.x, -c.y) + r * vec2(cos(a), sin(a)), cos(a), sin(a));
   }
 
   vec3 framePoint(vec3 from) {
@@ -292,6 +315,54 @@ export const particleVertex = /* glsl */ `
     return e;
   }
 
+  // Target of project k: returns 1 if this particle draws part of it (xy = world target,
+  // art = 1 for the illustration, 0 for the text).
+  float workTarget(float k, out vec2 xy, out float art) {
+    xy = vec2(0.0);
+    art = 0.0;
+    if (k < -0.5 || k > uWorkCount - 0.5) return 0.0;
+    vec2 raw = k < 0.5 ? aWorkA.xy : k < 1.5 ? aWorkA.zw : k < 2.5 ? aWorkB.xy : k < 3.5 ? aWorkB.zw : k < 4.5 ? aWorkC.xy : aWorkC.zw;
+    if (raw.x > 5e3) return 0.0;
+    art = step(500.0, raw.x);
+    xy = vec2(raw.x - art * 1000.0, raw.y);
+    return 1.0;
+  }
+
+  // Works: the scenery assembles into project 0, which flies straight into project 1, and so on;
+  // after the last one the particles return to the scenery. Particles land in a sweep from left
+  // to right (WORK_LAND in Journey.jsx follows the same front); the outgoing project first
+  // dissolves back into particles. Returns the formation weight.
+  float works(inout vec3 p, inout float spellW, inout float landed, inout float melt) {
+    float k0 = floor(uWork);
+    float f = uWork - k0;
+    vec2 a;
+    vec2 b;
+    float artA;
+    float artB;
+    float hasA = workTarget(k0, a, artA);
+    float hasB = f > 0.0 ? workTarget(k0 + 1.0, b, artB) : 0.0;
+    if (hasA + hasB < 0.5) return 0.0;
+    vec2 jitter = aJourney.zw * 0.0025;
+    vec3 from = hasA > 0.5 ? vec3(a + jitter, 0.0) : p;
+    vec3 to = hasB > 0.5 ? vec3(b + jitter, 0.0) : p;
+    float xn = clamp((hasB > 0.5 ? b.x : a.x) / (2.0 * uHalf.x) + 0.5, 0.0, 1.0);
+    float t = clamp((f - 0.06 - 0.5 * xn - 0.08 * aRandom.w) / 0.32, 0.0, 1.0);
+    float e = easeInOutCubic(t);
+    vec2 d = to.xy - from.xy;
+    float side = aRandom.z < 0.5 ? -1.0 : 1.0;
+    p = mix(from, to, e);
+    p.xy += vec2(-d.y, d.x) * 0.22 * side * sin(PI * e) * (1.0 - e * 0.5);
+    p.z += sin(PI * e) * (aRandom.x - 0.5) * 0.8;
+    float w = mix(hasA, hasB, e);
+    spellW = max(spellW, w);
+    float meltA = hasA * (1.0 - smoothstep(0.0, 0.12, f));
+    float meltB = hasB * smoothstep(0.82, 1.0, t);
+    landed = max(landed, max(meltA, meltB));
+    // Text melts into the solid DOM copy; the illustration keeps a glitter over the silver drawing.
+    melt = mix(0.16, 0.5, meltA > meltB ? artA : artB);
+    return w;
+  }
+
   void main() {
     float ph = aRandom.z * TAU;
 
@@ -327,6 +398,14 @@ export const particleVertex = /* glsl */ `
       world.xyz = mix(world.xyz, ribbon + cloud, easeInOutCubic(leave));
       edgeOn *= settle;
     }
+    float landed = 0.0;
+    float spellW = 0.0;
+    float melt = 0.16;
+    float workW = 0.0;
+    if (uWork > -1.0 && uWork < uWorkCount) {
+      workW = works(world.xyz, spellW, landed, melt);
+      edgeOn *= 1.0 - workW;
+    }
     float shapeGlow = 1.0;
     if (uExp > 0.0001) {
       float g;
@@ -336,8 +415,7 @@ export const particleVertex = /* glsl */ `
       shapeGlow = mix(1.0, g, t);
       edgeOn *= 1.0 - t;
     }
-    float landed = 0.0;
-    float spellW = spell(world.xyz, aSpell.xy, uExpSpell, landed);
+    spellW = max(spellW, spell(world.xyz, aSpell.xy, uExpSpell, landed));
     if (uAch > 0.0001) {
       float g;
       vec3 target = achievementPoint(g);
@@ -413,7 +491,9 @@ export const particleVertex = /* glsl */ `
     // Flying letters read as bright glitter; once landed they melt into the solid text, leaving
     // a faint shimmer on it.
     b *= mix(1.0, 1.7, spellW * (1.0 - uFrame));
-    b *= mix(1.0, 0.16, landed * (1.0 - uFrame));
+    b *= mix(1.0, melt, landed * (1.0 - uFrame));
+    // The scenery steps back while a project is on screen, so the drawing reads clearly.
+    b *= mix(1.0, 0.4, uWorkDim * (1.0 - workW));
     b *= 0.86 + 0.14 * sin(uTime * (0.6 + aRandom.z * 2.4) + ph * 9.0);
 
     // The cursor doubles as a soft light: contours facing it catch more light.

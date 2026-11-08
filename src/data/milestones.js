@@ -1,7 +1,7 @@
 // Experience timeline and achievements shown after the works.
 export const experience = [
   { date: '2025 June', role: 'Intern Trainee at A S Codelabs' },
-  { date: '2026 May to Present', role: 'Junior Developer' },
+  { date: '2026 May to Present', role: 'Junior Developer at A S Codelabs' },
 ];
 
 // icon: trophy | medal | code | laurel. `result` is emphasised, `event` follows it.

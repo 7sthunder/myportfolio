@@ -26,6 +26,14 @@ export class PortraitParticles {
     const spell = new THREE.BufferAttribute(new Float32Array(data.count * 4).fill(1e4), 4);
     spell.setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute('aSpell', spell);
+    // Works formations, two projects per attribute (aWorkA = projects 0 / 1, aWorkB = 2 / 3,
+    // aWorkC = 4 / 5): world xy, +1000 on x for the illustration, 1e4 = not part of it.
+    // Filled by setWorkTargets.
+    for (const name of ['aWorkA', 'aWorkB', 'aWorkC']) {
+      const attr = new THREE.BufferAttribute(new Float32Array(data.count * 4).fill(1e4), 4);
+      attr.setUsage(THREE.DynamicDrawUsage);
+      geometry.setAttribute(name, attr);
+    }
     geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
 
     this.count = data.count;
@@ -70,6 +78,9 @@ export class PortraitParticles {
       uNodes: { value: new THREE.Vector4(0, 1, 0, -1) },
       uNodeR: { value: 0.1 },
       uAch: { value: 0 },
+      uWork: { value: -1 },
+      uWorkCount: { value: 0 },
+      uWorkDim: { value: 0 },
       uExpSpell: { value: 0 },
       uAchSpell: { value: 0 },
       uFrame: { value: 0 },
