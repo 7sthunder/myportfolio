@@ -1,7 +1,9 @@
 // Works shown in the "Some selected works" section, one at a time. Each one is drawn by the
-// particles as a silver illustration (art = key in components/WorkArt.jsx).
+// particles as a silver illustration (art = key in components/WorkArt.jsx). Each one also has a
+// case study at /projects/<slug> (content in data/caseStudies.js).
 export const works = [
   {
+    slug: 'crossfit-os',
     title: 'CrossFit OS',
     info: 'Company project',
     summary: 'Website, store and community platform for CrossFit gyms.',
@@ -10,6 +12,7 @@ export const works = [
     live: 'https://crossfitos.com',
   },
   {
+    slug: 'transport-management-system',
     title: 'Transport Management System',
     info: 'Company project',
     summary: 'Trips, drivers, vehicles, revenue and expenses for a transport fleet in one dashboard.',
@@ -18,6 +21,7 @@ export const works = [
     live: 'https://tms.ascodelabs.com',
   },
   {
+    slug: 'a-s-unique-group',
     title: 'A S Unique Group',
     info: 'Company project',
     summary: 'Recruitment platform tracking candidates, deployments and open requirements.',
@@ -26,6 +30,7 @@ export const works = [
     live: 'https://asuniquegroup.com/app',
   },
   {
+    slug: 'stamp',
     title: 'STAMP',
     info: 'Company project',
     summary: 'Production CRM that follows every job order from intake to delivery.',
@@ -34,6 +39,7 @@ export const works = [
     live: 'http://stamp-crm.ascodelabs.com/',
   },
   {
+    slug: 'meditrack-ai',
     title: 'MediTrack AI',
     info: 'Independent',
     summary: 'One secure vault for medical records and medication tracking.',
@@ -41,6 +47,7 @@ export const works = [
     art: 'pills',
   },
   {
+    slug: 'docuverify',
     title: 'DocuVerify',
     info: 'Independent',
     summary: 'Forensic document analysis that scores authenticity and highlights suspicious regions.',

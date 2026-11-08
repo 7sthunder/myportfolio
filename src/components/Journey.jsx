@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Link } from 'react-router-dom';
 import { achievements, experience } from '../data/milestones.js';
 import { site } from '../data/site.js';
 import { works } from '../data/works.js';
@@ -81,14 +82,22 @@ function WorkPanel({ work, index, panelRef }) {
             </li>
           ))}
         </ul>
-        {work.live && (
-          <a className="pp-work__link pp-reveal" href={work.live} target="_blank" rel="noreferrer">
-            Visit live site
+        <div className="pp-work__actions">
+          <Link className="pp-work__link pp-reveal" to={`/projects/${work.slug}`}>
+            Read the case study
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </a>
-        )}
+          </Link>
+          {work.live && (
+            <a className="pp-work__link pp-reveal" href={work.live} target="_blank" rel="noreferrer">
+              Visit live site
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
+          )}
+        </div>
       </div>
       <div className="pp-work__art pp-reveal">
         <WorkArt name={work.art} />
@@ -241,6 +250,7 @@ export default function Journey() {
       }
 
       const tick = () => {
+        if (!root.current) return;
         const t = tl.time();
         set(statement.current, t >= T.statementIn && t < T.statementOut);
         set(kicker.current, t >= T.kickerIn && t < T.kickerOut);
